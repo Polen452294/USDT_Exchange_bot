@@ -39,6 +39,24 @@ class Draft(Base):
     desired_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
+    nudge2_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge2_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    nudge3_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge3_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    nudge4_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge4_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    nudge5_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge5_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    nudge6_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge6_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    nudge7_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge7_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
     # ✅ ВАЖНО: для идемпотентности подтверждения
     client_request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 

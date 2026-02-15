@@ -4,6 +4,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 from app.models import Direction
 from app.keyboards import kb_start
@@ -45,13 +46,18 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
 async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     await cb.answer()
 
-    direction = cb.data.split(":", 1)[1]
-    tg_id = cb.from_user.id
+    direction_value = cb.data.split(":", 1)[1]
+    direction = Direction(direction_value)
 
+    tg_id = cb.from_user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    draft.direction = Direction(direction)
-    draft.client_request_id = None  # на всякий случай
-    draft.last_step = "direction"
+    if draft is None:
+        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        session.add(draft)
+
+    draft.direction = direction
+    draft.last_step = "amount_wait"
+    draft.updated_at = datetime.utcnow()
     await session.commit()
 
     await cb.message.answer("Введите, пожалуйста, сумму, которую вы отдаёте.")

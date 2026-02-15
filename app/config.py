@@ -6,6 +6,10 @@ class Settings(BaseSettings):
 
     BOT_TOKEN: str
 
+    nudge2_delay_seconds: int = 900
+    nudge_worker_interval_seconds: int = 60
+    nudge2_resend_after_seconds: int = 0
+
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "usdt_exchange"
@@ -13,6 +17,21 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "postgres"
 
     LOG_LEVEL: str = "INFO"
+
+    crm_mode: str = "mock"
+    crm_base_url: str = ""
+    crm_token: str = ""
+    crm_timeout: float = 10.0
+
+    crm_offices_path: str = "/offices"
+    crm_rates_path: str = "/rates"
+    crm_create_request_path: str = "/requests"
+    crm_event_path: str = "/events"
+    crm_status_path: str = "/requests/status"
+
+    crm_idempotency_header: str = "Idempotency-Key"
+    crm_auth_header: str = "Authorization"
+    crm_auth_prefix: str = "Bearer"
 
     @property
     def db_url(self) -> str:

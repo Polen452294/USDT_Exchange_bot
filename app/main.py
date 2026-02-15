@@ -7,6 +7,7 @@ from typing import Any, Dict
 from aiogram import BaseMiddleware, Bot, Dispatcher
 from aiogram.types import TelegramObject
 
+from app.nudges.worker import run_nudge_worker
 from app.config import settings
 from app.db import AsyncSessionLocal, engine
 from app.models import Base
@@ -42,6 +43,8 @@ async def main() -> None:
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
 
+    asyncio.create_task(run_nudge_worker(bot))
+
     # middleware (сессия БД в data["session"])
     dp.update.middleware(DbSessionMiddleware())
 
@@ -55,6 +58,11 @@ async def main() -> None:
 
     await dp.start_polling(bot)
 
+'''async def nudge_worker(bot: Bot):
+    while True:
+        async with AsyncSessionLocal() as session:
+            # логика выбора кандидатов
+        await asyncio.sleep(60)'''
 
 if __name__ == "__main__":
     asyncio.run(main())

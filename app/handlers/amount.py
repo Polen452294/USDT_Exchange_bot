@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from datetime import datetime
+
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -7,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Draft
 from app.states import ExchangeFlow
 from app.utils import parse_amount
-from app.services.crm_client import CRMClientMock
 from app.keyboards import kb_offices
+from app.services.crm_client import get_crm_client, CRMTemporaryError, CRMPermanentError
 
 router = Router()
 
@@ -32,10 +36,22 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
 
     draft.give_amount = float(amount)
     draft.last_step = "amount"
+    draft.updated_at = datetime.utcnow()
     await session.commit()
 
-    crm = CRMClientMock()
-    offices = crm.get_offices()
+    crm = get_crm_client()
+    try:
+        offices = await crm.get_offices()
+    except (CRMTemporaryError, CRMPermanentError):
+        await message.answer(
+            "Сейчас не могу получить список офисов. Попробуйте чуть позже или напишите менеджеру @coinpointlara."
+        )
+        return
+    except Exception:
+        await message.answer(
+            "Произошла ошибка при получении офисов. Попробуйте чуть позже."
+        )
+        return
 
     await message.answer(
         "Выберите, пожалуйста, где вам удобнее провести обмен",
