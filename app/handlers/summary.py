@@ -51,8 +51,12 @@ async def send_summary( message: Message, state: FSMContext, session: AsyncSessi
 
     office_label = crm.get_office_label(draft.office_id)
 
-    give_currency = "USDT" if direction == "USDT_TO_CASH" else "наличные"
-    recv_currency = "наличные" if direction == "USDT_TO_CASH" else "USDT"
+    if direction == "USDT_TO_CASH":
+        give_currency = "USDT"
+        recv_currency = "наличные"
+    else:
+        give_currency = "наличные"
+        recv_currency = "USDT"
 
     summary = (
         "Почти готово. Проверьте, пожалуйста, данные заявки – покажу всё одним блоком.\n"

@@ -1,14 +1,14 @@
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram import Router
+from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.keyboards import kb_next, kb_offices
 from app.models import Draft
 from app.states import ExchangeFlow
 from app.utils import parse_amount
 from app.services.crm_client import CRMClientMock
+from app.keyboards import kb_offices
 
 router = Router()
 
@@ -18,7 +18,10 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
     try:
         amount = parse_amount(message.text)
     except Exception:
-        await message.answer("Введите число больше 0 (можно с точкой). Например: 1500 или 1500.50")
+        await message.answer(
+            "Введите число больше 0.\n"
+            "Можно использовать дробную часть (например: 1500 или 1500.50)."
+        )
         return
 
     tg_id = message.from_user.id
@@ -31,15 +34,12 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
     draft.last_step = "amount"
     await session.commit()
 
-    await message.answer("Ок. Нажмите «Далее», чтобы выбрать офис.", reply_markup=kb_next())
-
-
-@router.callback_query(ExchangeFlow.entering_amount, F.data == "next")
-async def amount_next(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
-    await cb.answer()
-
     crm = CRMClientMock()
     offices = crm.get_offices()
 
-    await cb.message.answer("Выберите, пожалуйста, где вам удобнее провести обмен", reply_markup=kb_offices(offices))
+    await message.answer(
+        "Выберите, пожалуйста, где вам удобнее провести обмен",
+        reply_markup=kb_offices(offices),
+    )
+
     await state.set_state(ExchangeFlow.choosing_office)

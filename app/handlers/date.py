@@ -19,7 +19,12 @@ async def enter_date_manual(message: Message, state: FSMContext, session: AsyncS
     try:
         d = parse_date_ddmmyyyy(message.text)
     except Exception:
-        await message.answer("Некорректная дата. Введите в формате дд.мм.гггг, например 14.03.2026")
+        today_example = date.today().strftime("%d.%m.%Y")
+        await message.answer(
+            "Некорректная дата.\n"
+            "Введите в формате: дд.мм.гггг\n"
+            f"Пример: {today_example}"
+        )
         return
 
     if d < date.today():
