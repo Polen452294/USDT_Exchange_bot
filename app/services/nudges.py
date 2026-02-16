@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2
+from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -24,6 +24,11 @@ NUDGE2_TEXT = (
     "Нажмите «Продолжить», и я покажу сводку и текущий курс."
 )
 
+NUDGE3_TEXT = (
+    "Небольшое напоминание: срок действия текущего курса скоро закончится.\n"
+    "Хотите, чтобы менеджер помог быстро зафиксировать условия по вашей заявке?"
+)
+
 STEPS_FOR_NUDGE2 = [
     "amount_wait",
     "amount",
@@ -32,7 +37,7 @@ STEPS_FOR_NUDGE2 = [
     "date_default",
     "username_auto",
     "username_manual",
-    "summary",
+    #"summary",
 ]
 
 _TERMINAL_STATUSES = {"done", "completed", "paid", "fixed", "closed"}
@@ -60,6 +65,7 @@ class NudgeService:
     async def tick(self) -> None:
         await self._check_nudge1()
         await self._check_nudge2()
+        await self._check_nudge3()
 
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
@@ -152,7 +158,6 @@ class NudgeService:
                         reply_markup=kb_nudge2(),
                     )
 
-                    await session.execute(select(Draft).where(Draft.id == draft_id))
                     draft = await session.get(Draft, draft_id)
                     if draft:
                         draft.nudge2_sent_at = datetime.utcnow()
@@ -163,3 +168,56 @@ class NudgeService:
                 except Exception:
                     await session.rollback()
                     log.exception("n2 send failed: uid=%s", uid)
+
+    async def _check_nudge3(self) -> None:
+        now = datetime.utcnow()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Draft.id, Draft.telegram_user_id, Draft.client_request_id)
+                .where(Draft.step6_at.is_not(None))
+                .where(Draft.nudge3_planned_at.is_not(None))
+                .where(Draft.nudge3_planned_at <= now)
+                .where(Draft.nudge3_sent_at.is_(None))
+                .where(Draft.nudge3_answer.is_(None))
+                .limit(50)
+            )
+
+            rows = (await session.execute(stmt)).all()
+            if not rows:
+                return
+
+            log.info("n3 candidates=%d", len(rows))
+
+            for draft_id, uid, client_request_id in rows:
+                uid = int(uid)
+
+                try:
+                    if client_request_id:
+                        req_exists = await session.scalar(
+                            select(Request.id).where(Request.client_request_id == str(client_request_id))
+                        )
+                        if req_exists:
+                            draft = await session.get(Draft, draft_id)
+                            if draft and draft.nudge3_answer is None:
+                                draft.nudge3_answer = "skip_confirmed"
+                                draft.nudge3_sent_at = now
+                                await session.commit()
+                            continue
+
+                    await self.bot.send_message(
+                        chat_id=uid,
+                        text=NUDGE3_TEXT,
+                        reply_markup=kb_nudge3(),
+                    )
+
+                    draft = await session.get(Draft, draft_id)
+                    if draft and draft.nudge3_sent_at is None:
+                        draft.nudge3_sent_at = datetime.utcnow()
+                        await session.commit()
+
+                    log.info("n3 sent: uid=%s draft_id=%s", uid, draft_id)
+
+                except Exception:
+                    await session.rollback()
+                    log.exception("n3 send failed: uid=%s", uid)

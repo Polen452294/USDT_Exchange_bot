@@ -47,3 +47,10 @@ def kb_nudge1() -> InlineKeyboardMarkup:
     kb.button(text="Написать менеджеру самому: @coinpointlara", callback_data="n1:manager")
     kb.adjust(1)
     return kb.as_markup()
+
+def kb_nudge3():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Да, зафиксировать", callback_data="n3:yes")
+    kb.button(text="Не сейчас", callback_data="n3:no")
+    kb.adjust(1)
+    return kb.as_markup()

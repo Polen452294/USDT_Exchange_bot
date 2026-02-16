@@ -155,7 +155,11 @@ class RequestService:
             username=str(draft.username),
             summary_text=str(summary_text),
         )
-
+        
+        req.nudge1_planned_at = datetime.utcnow() + timedelta(
+        seconds=settings.nudge1_delay_seconds
+            )
+        
         req.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
 
         try:

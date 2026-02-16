@@ -4,13 +4,11 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
-from datetime import timedelta
-from app.config import settings
+from datetime import datetime, timedelta
 
-from app.models import Direction
+from app.config import settings
+from app.models import Direction, Draft
 from app.keyboards import kb_start
-from app.models import Draft
 from app.states import ExchangeFlow
 
 router = Router()
@@ -39,9 +37,21 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
         draft = Draft(telegram_user_id=tg_id, last_step="start")
         session.add(draft)
     else:
+        draft.direction = None
+        draft.give_amount = None
+        draft.office_id = None
+        draft.desired_date = None
+        draft.username = None
+        draft.client_request_id = None
+
         draft.nudge2_planned_at = None
         draft.nudge2_sent_at = None
         draft.nudge2_answer = None
+
+        draft.step6_at = None
+        draft.nudge3_planned_at = None
+        draft.nudge3_sent_at = None
+        draft.nudge3_answer = None
 
         draft.last_step = "start"
         draft.updated_at = datetime.utcnow()
@@ -68,10 +78,12 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     draft.direction = direction
     draft.last_step = "amount_wait"
     draft.updated_at = datetime.utcnow()
+
     delay = int(getattr(settings, "nudge2_delay_seconds", 900))
     draft.nudge2_planned_at = datetime.utcnow() + timedelta(seconds=delay)
     draft.nudge2_sent_at = None
     draft.nudge2_answer = None
+
     await session.commit()
 
     await cb.message.answer("Введите, пожалуйста, сумму, которую вы отдаёте.")

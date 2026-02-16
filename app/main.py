@@ -7,7 +7,7 @@ from app.bootstrap import build_bot, build_dispatcher, setup_logging
 from app.config import settings
 from app.db import engine
 from app.models import Base
-
+from app.handlers import start, amount, office, date, username, summary, nudge2, nudge3
 
 
 async def on_startup() -> None:
@@ -32,6 +32,7 @@ async def on_startup() -> None:
             ALTER TABLE requests
             ADD COLUMN IF NOT EXISTS nudge1_answer VARCHAR(32) NULL
         """))
+
         await conn.execute(text("""
             ALTER TABLE drafts
             ADD COLUMN IF NOT EXISTS step6_at TIMESTAMP NULL

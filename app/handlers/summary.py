@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.states import ExchangeFlow
 from app.keyboards import kb_confirm, kb_start
 from app.repositories.drafts import DraftRepository
@@ -41,6 +44,17 @@ async def send_summary(message: Message, state: FSMContext, session: AsyncSessio
     await message.answer(summary.summary_text, reply_markup=kb_confirm())
     await state.set_state(ExchangeFlow.confirming)
 
+    draft = await draft_repo.get_by_user_id(user_id)
+    if draft:
+        now = datetime.utcnow()
+        draft.step6_at = now
+
+        if draft.nudge3_sent_at is None and draft.nudge3_answer is None:
+            delay = int(getattr(settings, "nudge3_delay_seconds", 6000))
+            draft.nudge3_planned_at = now + timedelta(seconds=delay)
+
+        await draft_repo.save()
+
 
 @router.callback_query(F.data == "confirm:no")
 async def confirm_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -57,6 +71,12 @@ async def confirm_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession
         draft.username = None
         draft.client_request_id = None
         draft.last_step = "start"
+
+        draft.step6_at = None
+        draft.nudge3_planned_at = None
+        draft.nudge3_sent_at = None
+        draft.nudge3_answer = None
+
         await draft_repo.save()
 
     await state.clear()
