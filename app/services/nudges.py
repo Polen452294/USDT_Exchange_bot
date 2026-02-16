@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3
+from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -27,6 +27,12 @@ NUDGE2_TEXT = (
 NUDGE3_TEXT = (
     "Небольшое напоминание: срок действия текущего курса скоро закончится.\n"
     "Хотите, чтобы менеджер помог быстро зафиксировать условия по вашей заявке?"
+)
+
+NUDGE4_TEXT = (
+    "Пишу напомнить, что наши менеджеры на связи и готовы предложить вам "
+    "специальные условия обмена. Нажмите Да, чтобы получить специальное "
+    "предложение"
 )
 
 STEPS_FOR_NUDGE2 = [
@@ -66,6 +72,7 @@ class NudgeService:
         await self._check_nudge1()
         await self._check_nudge2()
         await self._check_nudge3()
+        await self._check_nudge4()
 
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
@@ -221,3 +228,42 @@ class NudgeService:
                 except Exception:
                     await session.rollback()
                     log.exception("n3 send failed: uid=%s", uid)
+    async def _check_nudge4(self) -> None:
+        now = datetime.utcnow()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Draft.id, Draft.telegram_user_id)
+                .where(Draft.nudge2_answer == "later")
+                .where(Draft.nudge4_planned_at.is_not(None))
+                .where(Draft.nudge4_planned_at <= now)
+                .where(Draft.nudge4_sent_at.is_(None))
+                .where(Draft.nudge4_answer.is_(None))
+                .limit(50)
+            )
+
+            rows = (await session.execute(stmt)).all()
+            if not rows:
+                return
+
+            log.info("n4 candidates=%d", len(rows))
+
+            for draft_id, uid in rows:
+                uid = int(uid)
+                try:
+                    await self.bot.send_message(
+                        chat_id=uid,
+                        text=NUDGE4_TEXT,
+                        reply_markup=kb_nudge4(),
+                    )
+
+                    draft = await session.get(Draft, draft_id)
+                    if draft and draft.nudge4_sent_at is None:
+                        draft.nudge4_sent_at = datetime.utcnow()
+                        await session.commit()
+
+                    log.info("n4 sent: uid=%s draft_id=%s", uid, draft_id)
+
+                except Exception:
+                    await session.rollback()
+                    log.exception("n4 send failed: uid=%s", uid)

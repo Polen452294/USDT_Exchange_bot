@@ -1,13 +1,13 @@
 from __future__ import annotations
-
 from datetime import datetime
-
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta
 
+from app.config import settings
 from app.models import Draft
 from app.keyboards import kb_start
 from app.states import ExchangeFlow
@@ -81,6 +81,11 @@ async def n2_click(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
 
     if action == "later":
         draft.nudge2_answer = "later"
+        draft.nudge2_answered_at = datetime.utcnow()
+        delay = int(getattr(settings, "nudge4_delay_seconds", 86400))
+        draft.nudge4_planned_at = draft.nudge2_answered_at + timedelta(seconds=delay)
+        draft.nudge4_sent_at = None
+        draft.nudge4_answer = None
         draft.updated_at = datetime.utcnow()
         await session.commit()
 

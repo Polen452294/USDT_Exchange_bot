@@ -53,6 +53,11 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
         draft.nudge3_sent_at = None
         draft.nudge3_answer = None
 
+        draft.nudge2_answered_at = None
+        draft.nudge4_planned_at = None
+        draft.nudge4_sent_at = None
+        draft.nudge4_answer = None
+
         draft.last_step = "start"
         draft.updated_at = datetime.utcnow()
 

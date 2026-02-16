@@ -41,6 +41,14 @@ async def on_startup() -> None:
             ALTER TABLE drafts
             ADD COLUMN IF NOT EXISTS nudge3_planned_at TIMESTAMP NULL
         """))
+        await conn.execute(text("""
+            ALTER TABLE drafts
+            ADD COLUMN IF NOT EXISTS nudge2_answered_at TIMESTAMP NULL
+        """))
+        await conn.execute(text("""
+            ALTER TABLE drafts
+            ADD COLUMN IF NOT EXISTS nudge4_planned_at TIMESTAMP NULL
+        """))
 
 
 async def main() -> None:

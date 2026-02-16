@@ -61,6 +61,9 @@ class Draft(Base):
     nudge7_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge7_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
+    nudge2_answered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge4_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     client_request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     last_step: Mapped[str] = mapped_column(String(64), default="start")

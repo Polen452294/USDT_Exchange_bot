@@ -54,3 +54,9 @@ def kb_nudge3():
     kb.button(text="Не сейчас", callback_data="n3:no")
     kb.adjust(1)
     return kb.as_markup()
+
+def kb_nudge4() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Да", callback_data="n4:yes")
+    kb.adjust(1)
+    return kb.as_markup()
