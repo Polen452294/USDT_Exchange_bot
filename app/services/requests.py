@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
-
+from datetime import datetime, timedelta
+from app.config import settings
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Draft, Request, Direction
@@ -155,6 +155,8 @@ class RequestService:
             username=str(draft.username),
             summary_text=str(summary_text),
         )
+
+        req.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
 
         try:
             await self._requests.create(req)

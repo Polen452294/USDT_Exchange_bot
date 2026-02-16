@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,33 @@ from app.services.requests import RequestService
 from app.infrastructure.crm_client import CRMTemporaryError, CRMPermanentError
 
 router = Router()
+
+
+async def send_summary(message: Message, state: FSMContext, session: AsyncSession, *, user_id: int) -> None:
+    draft_repo = DraftRepository(session)
+    request_repo = RequestRepository(session)
+    service = RequestService(draft_repo, request_repo)
+
+    try:
+        summary = await service.build_summary(user_id)
+    except CRMTemporaryError:
+        await message.answer(
+            "Сейчас не могу получить курс (временная ошибка). "
+            "Пожалуйста, попробуйте ещё раз через минуту."
+        )
+        return
+    except CRMPermanentError:
+        await message.answer(
+            "Сейчас не могу получить курс. "
+            "Пожалуйста, напишите менеджеру @coinpointlara — он поможет вручную."
+        )
+        return
+    except Exception:
+        await message.answer("Не удалось сформировать сводку. Попробуйте снова.")
+        return
+
+    await message.answer(summary.summary_text, reply_markup=kb_confirm())
+    await state.set_state(ExchangeFlow.confirming)
 
 
 @router.callback_query(F.data == "confirm:no")

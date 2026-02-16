@@ -19,5 +19,8 @@ class RequestRepository:
         self._session.add(request)
         await self._session.commit()
 
+    async def save(self) -> None:
+        await self._session.commit()
+
     async def rollback(self) -> None:
         await self._session.rollback()

@@ -38,10 +38,13 @@ class Draft(Base):
     office_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     desired_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    
+
     nudge2_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge2_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge2_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    step6_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge3_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     nudge3_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge3_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -58,16 +61,13 @@ class Draft(Base):
     nudge7_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge7_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
-    # ✅ ВАЖНО: для идемпотентности подтверждения
     client_request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     last_step: Mapped[str] = mapped_column(String(64), default="start")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (
-        UniqueConstraint("telegram_user_id", name="uq_drafts_telegram_user_id"),
-    )
+    __table_args__ = (UniqueConstraint("telegram_user_id", name="uq_drafts_telegram_user_id"),)
 
 
 class Request(Base):
@@ -92,5 +92,9 @@ class Request(Base):
     status: Mapped[str] = mapped_column(String(64), default="created")
 
     summary_text: Mapped[str] = mapped_column(Text)
+
+    nudge1_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge1_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge1_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
