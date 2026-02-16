@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 def kb_start() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -32,3 +32,11 @@ def kb_confirm() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Нет, хочу внести изменения", callback_data="confirm:no")],
         ]
     )
+
+def kb_nudge2() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Продолжить", callback_data="n2:continue")
+    kb.button(text="Задать вопрос менеджеру", callback_data="n2:manager")
+    kb.button(text="Я еще подумаю", callback_data="n2:later")
+    kb.adjust(1)
+    return kb.as_markup()

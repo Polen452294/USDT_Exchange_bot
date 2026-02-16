@@ -5,6 +5,8 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+from datetime import timedelta
+from app.config import settings
 
 from app.models import Direction
 from app.keyboards import kb_start
@@ -36,7 +38,15 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
     if draft is None:
         draft = Draft(telegram_user_id=tg_id, last_step="start")
         session.add(draft)
-        await session.commit()
+    else:
+        draft.nudge2_planned_at = None
+        draft.nudge2_sent_at = None
+        draft.nudge2_answer = None
+
+        draft.last_step = "start"
+        draft.updated_at = datetime.utcnow()
+
+    await session.commit()
 
     await message.answer(START_TEXT, reply_markup=kb_start())
     await state.set_state(ExchangeFlow.choosing_direction)
@@ -58,6 +68,10 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     draft.direction = direction
     draft.last_step = "amount_wait"
     draft.updated_at = datetime.utcnow()
+    delay = int(getattr(settings, "nudge2_delay_seconds", 900))
+    draft.nudge2_planned_at = datetime.utcnow() + timedelta(seconds=delay)
+    draft.nudge2_sent_at = None
+    draft.nudge2_answer = None
     await session.commit()
 
     await cb.message.answer("Введите, пожалуйста, сумму, которую вы отдаёте.")

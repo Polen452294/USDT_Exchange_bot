@@ -8,8 +8,8 @@ class Settings(BaseSettings):
 
     DB_AUTO_CREATE: bool = True
 
-    nudge2_delay_seconds: int = 900
-    nudge_worker_interval_seconds: int = 60
+    nudge2_delay_seconds: int = 90
+    nudge_worker_interval_seconds: int = 30
     nudge2_resend_after_seconds: int = 0
 
     DB_HOST: str = "localhost"

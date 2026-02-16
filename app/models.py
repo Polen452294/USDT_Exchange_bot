@@ -38,7 +38,8 @@ class Draft(Base):
     office_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     desired_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-
+    
+    nudge2_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge2_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge2_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 

@@ -1,13 +1,13 @@
 from __future__ import annotations
-
 from datetime import datetime
-
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta
 
+from app.config import settings
 from app.models import Draft
 from app.states import ExchangeFlow
 from app.utils import parse_amount
@@ -37,6 +37,7 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
     draft.give_amount = float(amount)
     draft.last_step = "amount"
     draft.updated_at = datetime.utcnow()
+
     await session.commit()
 
     crm = get_crm_client()
