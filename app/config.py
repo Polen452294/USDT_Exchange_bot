@@ -6,6 +6,8 @@ class Settings(BaseSettings):
 
     BOT_TOKEN: str
 
+    DB_AUTO_CREATE: bool = True
+
     nudge2_delay_seconds: int = 900
     nudge_worker_interval_seconds: int = 60
     nudge2_resend_after_seconds: int = 0

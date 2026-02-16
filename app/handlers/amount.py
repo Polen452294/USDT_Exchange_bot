@@ -12,7 +12,7 @@ from app.models import Draft
 from app.states import ExchangeFlow
 from app.utils import parse_amount
 from app.keyboards import kb_offices
-from app.services.crm_client import get_crm_client, CRMTemporaryError, CRMPermanentError
+from app.infrastructure.crm_client import get_crm_client, CRMTemporaryError, CRMPermanentError
 
 router = Router()
 
