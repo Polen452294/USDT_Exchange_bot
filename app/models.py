@@ -106,3 +106,8 @@ class Request(Base):
     nudge5_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     nudge5_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     nudge5_answered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    nudge6_planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge6_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    nudge6_answer: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    nudge6_answered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

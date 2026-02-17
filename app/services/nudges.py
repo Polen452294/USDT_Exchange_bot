@@ -6,9 +6,10 @@ import asyncio
 from aiogram import Bot
 from sqlalchemy import select
 
+from app.config import Settings
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5
+from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5, kb_nudge6
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -38,6 +39,10 @@ NUDGE4_TEXT = (
 NUDGE5_TEXT = (
     "Напоминаю: через 14 дней у вас запланирован обмен.\n"
     "Подтвердите, пожалуйста — всё ещё актуально?"
+)
+
+NUDGE6_TEXT = (
+    "У нас есть для вас специальное предложение для заявки. Хотите узнать?"
 )
 
 STEPS_FOR_NUDGE2 = [
@@ -107,6 +112,7 @@ class NudgeService:
         await self._check_nudge3()
         await self._check_nudge4()
         await self._check_nudge5()
+        await self._check_nudge6()
 
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
@@ -124,8 +130,9 @@ class NudgeService:
                 .where(Request.nudge1_planned_at <= now)
                 .order_by(Request.id.asc())
                 .limit(50)
+                .with_for_update(skip_locked=True)
             )
-
+            
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -155,10 +162,17 @@ class NudgeService:
                     )
 
                     req = await session.get(Request, req_id)
-                    if req and req.nudge1_sent_at is None:
-                        req.nudge1_sent_at = datetime.utcnow()
-                        await session.commit()
+                    if not req or req.nudge1_sent_at is not None or req.nudge1_answer is not None:
+                        continue
 
+                    req.nudge1_sent_at = datetime.utcnow()
+                    await session.commit()
+
+                    await self.bot.send_message(
+                        chat_id=uid,
+                        text=NUDGE1_TEXT,
+                        reply_markup=kb_nudge1(),
+                    )
                     log.info("n1 sent: uid=%s req_id=%s", uid, req_id)
 
                 except Exception:
@@ -182,6 +196,7 @@ class NudgeService:
                 .where(Draft.nudge2_planned_at.is_not(None))
                 .where(Draft.nudge2_planned_at <= now)
             )
+
 
             rows = (await session.execute(stmt)).all()
             if not rows:
@@ -415,3 +430,72 @@ class NudgeService:
                 except Exception as e:
                     await session.rollback()
                     log.exception("n5 send failed: uid=%s req_id=%s err=%r", uid, req_id, e)
+
+    async def _check_nudge6(self) -> None:
+        now = datetime.utcnow()
+        today = now.date()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(
+                    Request.id,
+                    Request.telegram_user_id,
+                    Request.crm_request_id,
+                )
+                .where(Request.nudge6_planned_at.is_not(None))
+                .where(Request.nudge6_planned_at <= now)
+                .where(Request.nudge6_sent_at.is_(None))
+                .where(Request.nudge6_answer.is_(None))
+                .where(Request.nudge5_sent_at.is_not(None))
+                .where(Request.nudge5_answer.is_(None))
+                .order_by(Request.id.asc())
+                .limit(50)
+            )
+
+            rows = (await session.execute(stmt)).all()
+            if not rows:
+                return
+
+            log.info("n6 candidates=%d", len(rows))
+
+            crm = get_crm_client()
+
+            for req_id, uid, crm_request_id in rows:
+                uid = int(uid)
+
+                try:
+                    req = await session.get(Request, req_id)
+                    if req is None:
+                        continue
+
+                    if req.desired_date is None or req.desired_date == today:
+                        req.nudge6_sent_at = now
+                        req.nudge6_answer = "skip_date"
+                        await session.commit()
+                        continue
+
+                    if crm_request_id:
+                        st = await crm.check_status(str(crm_request_id))
+                        if isinstance(st, dict):
+                            status = str(st.get("status") or "").strip().lower()
+                            if status in _TERMINAL_STATUSES:
+                                req.nudge6_sent_at = now
+                                req.nudge6_answer = "skip_terminal"
+                                await session.commit()
+                                continue
+
+                    await self.bot.send_message(
+                        chat_id=uid,
+                        text=NUDGE6_TEXT,
+                        reply_markup=kb_nudge6(req.id),
+                    )
+
+                    if req.nudge6_sent_at is None:
+                        req.nudge6_sent_at = datetime.utcnow()
+                        await session.commit()
+
+                    log.info("n6 sent: uid=%s req_id=%s", uid, req_id)
+
+                except Exception:
+                    await session.rollback()
+                    log.exception("n6 send failed: uid=%s req_id=%s", uid, req_id)

@@ -65,6 +65,22 @@ async def on_startup() -> None:
             ALTER TABLE requests
             ADD COLUMN IF NOT EXISTS nudge5_answered_at TIMESTAMP NULL
         """))
+        await conn.execute(text("""
+            ALTER TABLE requests
+            ADD COLUMN IF NOT EXISTS nudge6_planned_at TIMESTAMP NULL
+        """))
+        await conn.execute(text("""
+            ALTER TABLE requests
+            ADD COLUMN IF NOT EXISTS nudge6_sent_at TIMESTAMP NULL
+        """))
+        await conn.execute(text("""
+            ALTER TABLE requests
+            ADD COLUMN IF NOT EXISTS nudge6_answer VARCHAR(32) NULL
+        """))
+        await conn.execute(text("""
+            ALTER TABLE requests
+            ADD COLUMN IF NOT EXISTS nudge6_answered_at TIMESTAMP NULL
+        """))
 
 
 async def main() -> None:
