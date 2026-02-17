@@ -8,11 +8,15 @@ class Settings(BaseSettings):
 
     DB_AUTO_CREATE: bool = True
 
-    nudge1_delay_seconds: int = 10      # 20 минут
+    nudge1_delay_seconds: int = 1200      # 20 минут
     nudge2_delay_seconds: int = 900       # 15 минут
     nudge3_delay_seconds: int = 6000      # 100 минут
     nudge_worker_interval_seconds: int = 5
-    nudge4_delay_seconds: int = 86400  # 24 часа
+    nudge4_delay_seconds: int = 86400     # 24 часа
+
+    nudge5_lead_days: int = 14
+    nudge5_test_mode: bool = True
+    nudge5_test_delay_seconds: int = 10
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432

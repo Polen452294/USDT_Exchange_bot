@@ -156,11 +156,22 @@ class RequestService:
             summary_text=str(summary_text),
         )
         
-        req.nudge1_planned_at = datetime.utcnow() + timedelta(
-        seconds=settings.nudge1_delay_seconds
-            )
-        
         req.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
+
+        # ===== NUDGE 5 PLANNING =====
+        if settings.nudge5_test_mode:
+            req.nudge5_planned_at = datetime.utcnow() + timedelta(
+                seconds=settings.nudge5_test_delay_seconds
+            )
+        else:
+            today = datetime.utcnow().date()
+            if req.desired_date and req.desired_date != today:
+                if req.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
+                    planned_day = req.desired_date - timedelta(days=settings.nudge5_lead_days)
+                    req.nudge5_planned_at = datetime.combine(
+                        planned_day,
+                        datetime.min.time(),
+                    ).replace(hour=10, minute=0, second=0, microsecond=0)
 
         try:
             await self._requests.create(req)

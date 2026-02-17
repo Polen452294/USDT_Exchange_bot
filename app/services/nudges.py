@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-
+from datetime import datetime, timedelta, date
+import asyncio
 from aiogram import Bot
 from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4
+from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -35,6 +35,11 @@ NUDGE4_TEXT = (
     "предложение"
 )
 
+NUDGE5_TEXT = (
+    "Напоминаю: через 14 дней у вас запланирован обмен.\n"
+    "Подтвердите, пожалуйста — всё ещё актуально?"
+)
+
 STEPS_FOR_NUDGE2 = [
     "amount_wait",
     "amount",
@@ -43,7 +48,6 @@ STEPS_FOR_NUDGE2 = [
     "date_default",
     "username_auto",
     "username_manual",
-    #"summary",
 ]
 
 _TERMINAL_STATUSES = {"done", "completed", "paid", "fixed", "closed"}
@@ -64,6 +68,35 @@ def _crm_contacted(payload: dict) -> bool:
     return False
 
 
+def _crm_terminal(payload: dict) -> bool:
+    status = str(payload.get("status") or "").strip().lower()
+    return status in _TERMINAL_STATUSES
+
+
+def _format_request_block(req: Request) -> str:
+    try:
+        direction = req.direction.value
+    except Exception:
+        direction = str(req.direction)
+
+    office = getattr(req, "office_id", None) or getattr(req, "office", None) or "-"
+    desired = req.desired_date.strftime("%d.%m.%Y") if req.desired_date else "-"
+
+    give_amount = getattr(req, "give_amount", None)
+    receive_amount = getattr(req, "receive_amount", None)
+    rate = getattr(req, "rate", None)
+
+    return (
+        "Детали заявки:\n"
+        f"• Направление: {direction}\n"
+        f"• Сумма: {give_amount}\n"
+        f"• Офис: {office}\n"
+        f"• Дата: {desired}\n"
+        f"• Курс: {rate}\n"
+        f"• Получаете: {receive_amount}"
+    )
+
+
 class NudgeService:
     def __init__(self, bot: Bot) -> None:
         self.bot = bot
@@ -73,6 +106,7 @@ class NudgeService:
         await self._check_nudge2()
         await self._check_nudge3()
         await self._check_nudge4()
+        await self._check_nudge5()
 
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
@@ -228,6 +262,7 @@ class NudgeService:
                 except Exception:
                     await session.rollback()
                     log.exception("n3 send failed: uid=%s", uid)
+
     async def _check_nudge4(self) -> None:
         now = datetime.utcnow()
 
@@ -267,3 +302,116 @@ class NudgeService:
                 except Exception:
                     await session.rollback()
                     log.exception("n4 send failed: uid=%s", uid)
+
+    async def _check_nudge5(self) -> None:
+        now = datetime.utcnow()
+        today = now.date()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(
+                    Request.id,
+                    Request.telegram_user_id,
+                    Request.crm_request_id,
+                )
+                .where(Request.nudge5_planned_at.is_not(None))
+                .where(Request.nudge5_planned_at <= now)
+                .where(Request.nudge5_sent_at.is_(None))
+                .where(Request.nudge5_answer.is_(None))
+                .order_by(Request.id.asc())
+                .limit(50)
+            )
+
+            rows = (await session.execute(stmt)).all()
+            if not rows:
+                return
+
+            log.info("n5 candidates=%d", len(rows))
+
+            crm = get_crm_client()
+
+            for req_id, uid, crm_request_id in rows:
+                uid = int(uid)
+
+                log.info("n5 debug: start req_id=%s uid=%s crm_request_id=%s", req_id, uid, crm_request_id)
+
+                try:
+                    req = await session.get(Request, req_id)
+                    log.info("n5 debug: request loaded req_id=%s", req_id)
+
+                    if req is None:
+                        continue
+
+                    if req.desired_date is None or req.desired_date == today:
+                        req.nudge5_sent_at = now
+                        req.nudge5_answer = "skip_date"
+                        await session.commit()
+                        log.info("n5 debug: skipped by date req_id=%s", req_id)
+                        continue
+
+                    if crm_request_id:
+                        log.info("n5 debug: before crm.check_status req_id=%s", req_id)
+                        st = await asyncio.wait_for(
+                            crm.check_status(str(crm_request_id)),
+                            timeout=15,
+                        )
+                        log.info("n5 debug: after crm.check_status req_id=%s", req_id)
+
+                        if isinstance(st, dict):
+                            status = str(st.get("status") or "").lower()
+                            if status in {"done", "completed", "paid", "fixed", "closed"}:
+                                req.nudge5_sent_at = now
+                                req.nudge5_answer = "skip_terminal"
+                                await session.commit()
+                                log.info("n5 debug: skipped by terminal status req_id=%s", req_id)
+                                continue
+
+                    try:
+                        direction = req.direction.value
+                    except Exception:
+                        direction = str(req.direction)
+
+                    if direction == "USDT_TO_CASH":
+                        give_currency = "USDT"
+                        receive_currency = "наличные"
+                    else:
+                        give_currency = "наличные"
+                        receive_currency = "USDT"
+
+                    request_block = (
+                        f"➔ Вы отдаёте: {req.give_amount} {give_currency}\n"
+                        f"➔ Офис: {req.office_id}\n"
+                        f"➔ Дата получения: {req.desired_date.strftime('%d.%m.%Y')}\n"
+                        f"➔ Текущий курс: {req.rate}\n"
+                        f"➔ Вы получаете: {req.receive_amount} {receive_currency}"
+                    )
+
+                    text = (
+                        "Недавно вы оставляли заявку на обмен:\n\n"
+                        f"{request_block}\n\n"
+                        "Мы готовы помочь вам, если задача актуальна.\n"
+                        "Хотите, чтобы наш менеджер связался с вами напрямую и обсудил условия?"
+                    )
+
+                    log.info("n5 debug: before bot.send_message req_id=%s uid=%s", req_id, uid)
+
+                    await asyncio.wait_for(
+                        self.bot.send_message(
+                            chat_id=uid,
+                            text=text,
+                            reply_markup=kb_nudge5(req_id),
+                        ),
+                        timeout=15,
+                    )
+
+                    log.info("n5 debug: after bot.send_message req_id=%s uid=%s", req_id, uid)
+
+                    if req.nudge5_sent_at is None:
+                        req.nudge5_sent_at = datetime.utcnow()
+                        await session.commit()
+
+                    log.info("n5 sent: uid=%s req_id=%s", uid, req_id)
+
+                except Exception as e:
+                    await session.rollback()
+                    log.exception("n5 send failed: uid=%s req_id=%s err=%r", uid, req_id, e)
