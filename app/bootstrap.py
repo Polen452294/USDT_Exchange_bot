@@ -6,7 +6,7 @@ from typing import Any, Dict
 from aiogram import BaseMiddleware, Bot, Dispatcher
 from aiogram.types import TelegramObject
 
-from app.handlers import nudge3, nudge4, nudge5, nudge6, start, amount, office, date, username, summary, nudge2, nudge1
+from app.handlers import nudge3, nudge4, nudge5, nudge6, nudge7, start, amount, office, date, username, summary, nudge2, nudge1
 from app.config import settings
 from app.db import AsyncSessionLocal
 
@@ -47,5 +47,6 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(nudge4.router)
     dp.include_router(nudge5.router)
     dp.include_router(nudge6.router)
+    dp.include_router(nudge7.router)
 
     return dp

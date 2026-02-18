@@ -77,3 +77,12 @@ def kb_nudge6(request_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Нет", callback_data=f"n6_no:{request_id}")],
         ]
     )
+
+
+def kb_nudge7(request_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Да", callback_data=f"n7_yes:{request_id}")],
+            [InlineKeyboardButton(text="Нет", callback_data=f"n7_no:{request_id}")],
+        ]
+    )

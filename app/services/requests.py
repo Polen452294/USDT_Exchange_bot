@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from app.config import settings
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timedelta, time, timezone
+from zoneinfo import ZoneInfo
 
 from app.models import Draft, Request, Direction
 from app.repositories.drafts import DraftRepository
@@ -195,6 +196,16 @@ class RequestService:
             await self._requests.rollback()
             existing2 = await self._requests.get_by_client_request_id(client_request_id)
             return ConfirmResult(created=False, already_exists=True, crm_request_id=(existing2.crm_request_id if existing2 else None))
+
+        # ===== NUDGE 7 PLANNING =====
+        if settings.nudge7_test_mode:
+            req.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
+        else:
+            if req.desired_date:
+                istanbul = ZoneInfo("Europe/Istanbul")
+                local_dt = datetime.combine(req.desired_date, time(hour=10, minute=0), tzinfo=istanbul)
+                req.nudge7_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+
 
         crm = get_crm_client()
         try:

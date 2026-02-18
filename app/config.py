@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     nudge6_test_mode: bool = True
     nudge6_test_delay_seconds: int = 30
 
+    nudge7_test_mode: bool = True
+    nudge7_test_delay_seconds: int = 10
+
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "usdt_exchange"

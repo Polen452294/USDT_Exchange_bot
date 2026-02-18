@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, date
+from datetime import timezone
+from zoneinfo import ZoneInfo
 import asyncio
 from aiogram import Bot
 from sqlalchemy import select
@@ -9,7 +11,7 @@ from sqlalchemy import select
 from app.config import Settings
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5, kb_nudge6
+from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5, kb_nudge6, kb_nudge7
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -45,6 +47,12 @@ NUDGE6_TEXT = (
     "У нас есть для вас специальное предложение для заявки. Хотите узнать?"
 )
 
+NUDGE7_TEXT = (
+    "Доброе утро! Сегодня у вас запланирован обмен: (данные заявки). "
+    "Хотите, чтобы менеджер с вами?"
+)
+
+
 STEPS_FOR_NUDGE2 = [
     "amount_wait",
     "amount",
@@ -72,6 +80,33 @@ def _crm_contacted(payload: dict) -> bool:
 
     return False
 
+def _crm_terminal(payload: dict) -> bool:
+        status = str(payload.get("status") or "").strip().lower()
+        return status in _TERMINAL_STATUSES
+
+def _today_istanbul() -> datetime.date:
+    ist = ZoneInfo("Europe/Istanbul")
+    return datetime.now(tz=ist).date()
+
+def _format_request_block(req: Request) -> str:
+    try:
+        direction = req.direction.value
+    except Exception:
+        direction = str(req.direction)
+    office = getattr(req, "office_id", None) or "-"
+    desired = req.desired_date.strftime("%d.%m.%Y") if req.desired_date else "-"
+    give_amount = getattr(req, "give_amount", None)
+    receive_amount = getattr(req, "receive_amount", None)
+    rate = getattr(req, "rate", None)
+    return (
+        "Детали заявки:\n"
+        f"• Направление: {direction}\n"
+        f"• Сумма: {give_amount}\n"
+        f"• Офис: {office}\n"
+        f"• Дата: {desired}\n"
+        f"• Курс: {rate}\n"
+        f"• Получаете: {receive_amount}"
+    )
 
 def _crm_terminal(payload: dict) -> bool:
     status = str(payload.get("status") or "").strip().lower()
@@ -113,6 +148,7 @@ class NudgeService:
         await self._check_nudge4()
         await self._check_nudge5()
         await self._check_nudge6()
+        await self._check_nudge7()
 
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
@@ -500,3 +536,66 @@ class NudgeService:
                 except Exception:
                     await session.rollback()
                     log.exception("n6 send failed: uid=%s req_id=%s", uid, req_id)
+
+
+    async def _check_nudge7(self) -> None:
+        now = datetime.utcnow()
+        today_ist = _today_istanbul()
+
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Request.id, Request.telegram_user_id, Request.crm_request_id)
+                .where(Request.nudge7_planned_at.is_not(None))
+                .where(Request.nudge7_planned_at <= now)
+                .where(Request.nudge7_sent_at.is_(None))
+                .where(Request.nudge7_answer.is_(None))
+                .order_by(Request.id.asc())
+                .limit(50)
+            )
+
+            rows = (await session.execute(stmt)).all()
+            if not rows:
+                return
+
+            crm = get_crm_client()
+
+            for req_id, uid, crm_request_id in rows:
+                uid = int(uid)
+
+                try:
+                    req = await session.get(Request, req_id)
+                    if req is None:
+                        continue
+
+                    if req.desired_date != today_ist:
+                        req.nudge7_sent_at = now
+                        req.nudge7_answer = "skip_not_today"
+                        await session.commit()
+                        continue
+
+                    if crm_request_id:
+                        st = await crm.check_status(str(crm_request_id))
+                        if isinstance(st, dict) and _crm_terminal(st):
+                            req.nudge7_sent_at = now
+                            req.nudge7_answer = "skip_terminal"
+                            await session.commit()
+                            continue
+
+                    text = (
+                        "Доброе утро! Сегодня у вас запланирован обмен:\n\n"
+                        f"{_format_request_block(req)}\n\n"
+                        "Хотите, чтобы менеджер с вами?"
+                    )
+
+                    await self.bot.send_message(
+                        chat_id=uid,
+                        text=text,
+                        reply_markup=kb_nudge7(req.id),
+                    )
+
+                    req.nudge7_sent_at = datetime.utcnow()
+                    await session.commit()
+
+                except Exception:
+                    await session.rollback()
+                    log.exception("n7 send failed: uid=%s req_id=%s", uid, req_id)
