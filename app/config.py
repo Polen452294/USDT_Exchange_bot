@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     nudge1_delay_seconds: int = 1200      # 20 минут
     nudge2_delay_seconds: int = 900       # 15 минут
     nudge3_delay_seconds: int = 6000      # 100 минут
-    nudge_worker_interval_seconds: int = 5
+    nudge_worker_interval_seconds: int = 5 # обновление дожимов
     nudge4_delay_seconds: int = 86400     # 24 часа
 
     nudge5_lead_days: int = 14

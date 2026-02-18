@@ -132,7 +132,7 @@ class NudgeService:
                 .limit(50)
                 .with_for_update(skip_locked=True)
             )
-            
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -145,39 +145,40 @@ class NudgeService:
                 uid = int(uid)
 
                 try:
+                    req = await session.get(Request, req_id)
+                    if not req:
+                        continue
+
+                    # если уже ответил или уже отправляли — пропускаем
+                    if req.nudge1_answer is not None or req.nudge1_sent_at is not None:
+                        continue
+
+                    # если CRM уже в работе — не отправляем
                     if crm_request_id:
                         st = await crm.check_status(str(crm_request_id))
                         if isinstance(st, dict) and _crm_contacted(st):
-                            req = await session.get(Request, req_id)
-                            if req and req.nudge1_sent_at is None and req.nudge1_answer is None:
-                                req.nudge1_sent_at = now
-                                req.nudge1_answer = "skip_contacted"
-                                await session.commit()
+                            req.nudge1_sent_at = now
+                            req.nudge1_answer = "skip_contacted"
+                            await session.commit()
                             continue
 
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE1_TEXT,
-                        reply_markup=kb_nudge1(),
-                    )
-
-                    req = await session.get(Request, req_id)
-                    if not req or req.nudge1_sent_at is not None or req.nudge1_answer is not None:
-                        continue
-
+                    # 🔐 СНАЧАЛА резервируем отправку
                     req.nudge1_sent_at = datetime.utcnow()
                     await session.commit()
 
+                    # потом отправляем сообщение
                     await self.bot.send_message(
                         chat_id=uid,
                         text=NUDGE1_TEXT,
                         reply_markup=kb_nudge1(),
                     )
+
                     log.info("n1 sent: uid=%s req_id=%s", uid, req_id)
 
                 except Exception:
                     await session.rollback()
                     log.exception("n1 send failed: uid=%s req_id=%s", uid, req_id)
+
 
     async def _check_nudge2(self) -> None:
         now = datetime.utcnow()
