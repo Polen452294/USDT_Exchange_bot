@@ -80,33 +80,11 @@ def _crm_contacted(payload: dict) -> bool:
 
     return False
 
-def _crm_terminal(payload: dict) -> bool:
-        status = str(payload.get("status") or "").strip().lower()
-        return status in _TERMINAL_STATUSES
 
 def _today_istanbul() -> datetime.date:
     ist = ZoneInfo("Europe/Istanbul")
     return datetime.now(tz=ist).date()
 
-def _format_request_block(req: Request) -> str:
-    try:
-        direction = req.direction.value
-    except Exception:
-        direction = str(req.direction)
-    office = getattr(req, "office_id", None) or "-"
-    desired = req.desired_date.strftime("%d.%m.%Y") if req.desired_date else "-"
-    give_amount = getattr(req, "give_amount", None)
-    receive_amount = getattr(req, "receive_amount", None)
-    rate = getattr(req, "rate", None)
-    return (
-        "Детали заявки:\n"
-        f"• Направление: {direction}\n"
-        f"• Сумма: {give_amount}\n"
-        f"• Офис: {office}\n"
-        f"• Дата: {desired}\n"
-        f"• Курс: {rate}\n"
-        f"• Получаете: {receive_amount}"
-    )
 
 def _crm_terminal(payload: dict) -> bool:
     status = str(payload.get("status") or "").strip().lower()
@@ -185,11 +163,9 @@ class NudgeService:
                     if not req:
                         continue
 
-                    # если уже ответил или уже отправляли — пропускаем
                     if req.nudge1_answer is not None or req.nudge1_sent_at is not None:
                         continue
 
-                    # если CRM уже в работе — не отправляем
                     if crm_request_id:
                         st = await crm.check_status(str(crm_request_id))
                         if isinstance(st, dict) and _crm_contacted(st):
@@ -198,11 +174,9 @@ class NudgeService:
                             await session.commit()
                             continue
 
-                    # 🔐 СНАЧАЛА резервируем отправку
                     req.nudge1_sent_at = datetime.utcnow()
                     await session.commit()
 
-                    # потом отправляем сообщение
                     await self.bot.send_message(
                         chat_id=uid,
                         text=NUDGE1_TEXT,

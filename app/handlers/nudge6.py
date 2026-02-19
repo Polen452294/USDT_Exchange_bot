@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery
 
 from app.db import AsyncSessionLocal
 from app.models import Request
+from app.services.crm_events import send_request_nudge_event
 
 log = logging.getLogger("nudge6")
 
@@ -43,6 +44,10 @@ async def on_nudge6_answer(call: CallbackQuery):
         req.nudge6_answer = answer
         req.nudge6_answered_at = now
         await session.commit()
+        try:
+            await send_request_nudge_event(req, "nudge6", "yes" if answer == "YES" else "no")
+        except Exception:
+            pass
 
     if answer == "YES":
         await call.message.answer("Отлично. Передал менеджеру, он свяжется с вами в Telegram.")

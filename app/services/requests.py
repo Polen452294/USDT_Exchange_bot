@@ -156,39 +156,41 @@ class RequestService:
             username=str(draft.username),
             summary_text=str(summary_text),
         )
-        
+
         req.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
 
         # ===== NUDGE 5 PLANNING =====
         if settings.nudge5_test_mode:
-            req.nudge5_planned_at = datetime.utcnow() + timedelta(
-                seconds=settings.nudge5_test_delay_seconds
-            )
+            req.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
         else:
             today = datetime.utcnow().date()
             if req.desired_date and req.desired_date != today:
                 if req.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
                     planned_day = req.desired_date - timedelta(days=settings.nudge5_lead_days)
-                    req.nudge5_planned_at = datetime.combine(
-                        planned_day,
-                        datetime.min.time(),
-                    ).replace(hour=10, minute=0, second=0, microsecond=0)
+                    req.nudge5_planned_at = datetime.combine(planned_day, datetime.min.time()).replace(
+                        hour=10, minute=0, second=0, microsecond=0
+                    )
 
         # ===== NUDGE 6 PLANNING =====
         if settings.nudge6_test_mode:
-            req.nudge6_planned_at = datetime.utcnow() + timedelta(
-                seconds=settings.nudge6_test_delay_seconds
-            )
+            req.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
         else:
             today = datetime.utcnow().date()
-
             if req.desired_date and req.desired_date != today:
                 if req.desired_date >= (today + timedelta(days=settings.nudge6_lead_days)):
                     planned_day_6 = req.desired_date - timedelta(days=settings.nudge6_lead_days)
-                    req.nudge6_planned_at = datetime.combine(
-                        planned_day_6,
-                        datetime.min.time(),
-                    ).replace(hour=10, minute=0, second=0, microsecond=0)
+                    req.nudge6_planned_at = datetime.combine(planned_day_6, datetime.min.time()).replace(
+                        hour=10, minute=0, second=0, microsecond=0
+                    )
+
+        # ===== NUDGE 7 PLANNING =====
+        if settings.nudge7_test_mode:
+            req.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
+        else:
+            if req.desired_date:
+                istanbul = ZoneInfo("Europe/Istanbul")
+                local_dt = datetime.combine(req.desired_date, time(hour=10, minute=0), tzinfo=istanbul)
+                req.nudge7_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
 
         try:
             await self._requests.create(req)
