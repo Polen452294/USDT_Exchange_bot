@@ -29,4 +29,4 @@ async def enter_username(message: Message, state: FSMContext, session: AsyncSess
     await state.set_state(ExchangeFlow.confirming)
 
     from app.handlers.summary import send_summary
-    await send_summary(message, state, session)
+    await send_summary(message, state, session, user_id=tg_id)

@@ -161,7 +161,9 @@ class RequestService:
 
         # ===== NUDGE 5 PLANNING =====
         if settings.nudge5_test_mode:
-            req.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
+            istanbul = ZoneInfo("Europe/Istanbul")
+            local_dt = datetime.combine(planned_day, time(hour=10), tzinfo=istanbul)
+            req.nudge5_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
         else:
             today = datetime.utcnow().date()
             if req.desired_date and req.desired_date != today:
@@ -173,7 +175,9 @@ class RequestService:
 
         # ===== NUDGE 6 PLANNING =====
         if settings.nudge6_test_mode:
-            req.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
+            istanbul = ZoneInfo("Europe/Istanbul")
+            local_dt = datetime.combine(planned_day, time(hour=10), tzinfo=istanbul)
+            req.nudge6_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
         else:
             today = datetime.utcnow().date()
             if req.desired_date and req.desired_date != today:

@@ -46,9 +46,9 @@ async def on_nudge5_answer(call: CallbackQuery):
         await session.commit()
 
         try:
-            await send_request_nudge_event(req, "nudge5", "yes" if answer == "YES" else "no")
+            await send_request_nudge_event(req, "nudge5", action)
         except Exception:
-            pass
+            log.exception("CRM event failed: nudge5")
 
     if answer == "YES":
         await call.message.answer("Отлично. Передал менеджеру, он свяжется с вами в Telegram.")
