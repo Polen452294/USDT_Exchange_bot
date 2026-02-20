@@ -8,7 +8,28 @@ from app.config import settings
 from app.db import engine
 from app.models import Base
 from app.handlers import start, amount, office, date, username, summary, nudge2, nudge3
+from aiogram.types import BotCommand
+from aiogram.enums import BotCommandScopeType
+from aiogram.methods import SetMyCommands
+from aiogram.types import BotCommandScopeAllPrivateChats, BotCommandScopeChat
 
+async def setup_bot_commands(bot) -> None:
+    user_cmds = [
+        BotCommand(command="start", description="Начать заново"),
+    ]
+
+    admin_cmds = user_cmds + [
+        BotCommand(command="admin_requests", description="Последние 10 заявок"),
+        BotCommand(command="admin_request", description="Детали заявки по id"),
+        BotCommand(command="admin_crm_get", description="CRM статус по заявке"),
+        BotCommand(command="admin_crm_set", description="Установить CRM статус (mock)"),
+        BotCommand(command="admin_crm_events", description="События в CRM (mock)"),
+    ]
+
+    await bot(SetMyCommands(commands=user_cmds, scope=BotCommandScopeAllPrivateChats()))
+
+    for admin_id in settings.admin_ids:
+        await bot(SetMyCommands(commands=admin_cmds, scope=BotCommandScopeChat(chat_id=admin_id)))
 
 async def on_startup() -> None:
     async with engine.begin() as conn:
@@ -144,8 +165,10 @@ async def main() -> None:
     await on_startup()
 
     bot = build_bot()
-    dp = build_dispatcher()
+    await setup_bot_commands(bot)
 
+    dp = build_dispatcher()
+    
     await dp.start_polling(bot)
 
 

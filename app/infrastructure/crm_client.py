@@ -48,6 +48,8 @@ class CRMClientMock:
             {"id": "antalya_2", "button_text": "Анталья 2 (адрес)", "city": "Antalya"},
             {"id": "istanbul", "button_text": "Стамбул", "city": "Istanbul"},
         ]
+        self._statuses: dict[str, str] = {}
+        self._events: list[dict] = []
 
     async def get_offices(self) -> list[dict]:
         return list(self._offices)
@@ -65,13 +67,27 @@ class CRMClientMock:
         return base * 0.995
 
     async def create_request(self, payload: dict, *, idempotency_key: str) -> dict:
-        return {"crm_request_id": f"CRM-{idempotency_key}"}
+        crm_request_id = f"CRM-{idempotency_key}"
+        self._statuses.setdefault(crm_request_id, "new")
+        return {"crm_request_id": crm_request_id}
 
     async def send_event(self, payload: dict, *, idempotency_key: Optional[str] = None) -> None:
-        return None
+        self._events.append(
+            {
+                "idempotency_key": idempotency_key,
+                "payload": payload,
+            }
+        )
 
     async def check_status(self, crm_request_id: str) -> dict:
-        return {"status": "new"}
+        status = self._statuses.get(str(crm_request_id), "new")
+        return {"status": status}
+
+    async def mock_set_status(self, crm_request_id: str, status: str) -> None:
+        self._statuses[str(crm_request_id)] = str(status).strip()
+
+    async def mock_get_events(self, limit: int = 30) -> list[dict]:
+        return list(self._events[-max(1, int(limit)):])
 
 
 class CRMClientHTTP:

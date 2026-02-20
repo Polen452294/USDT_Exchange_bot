@@ -7,7 +7,6 @@ from app.config import settings
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, time, timezone
 from zoneinfo import ZoneInfo
-
 from app.models import Draft, Request, Direction
 from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
@@ -31,6 +30,10 @@ def _money(x: float) -> str:
 def _new_client_request_id() -> str:
     return uuid.uuid4().hex[:16] + "-" + str(int(datetime.utcnow().timestamp()))
 
+def _istanbul_10_to_utc_naive(day) -> datetime:
+    istanbul = ZoneInfo("Europe/Istanbul")
+    local_dt = datetime.combine(day, time(hour=10, minute=0), tzinfo=istanbul)
+    return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 @dataclass(frozen=True)
 class SummaryResult:
@@ -159,42 +162,32 @@ class RequestService:
 
         req.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
 
+        today = datetime.utcnow().date()
+
         # ===== NUDGE 5 PLANNING =====
         if settings.nudge5_test_mode:
-            istanbul = ZoneInfo("Europe/Istanbul")
-            local_dt = datetime.combine(planned_day, time(hour=10), tzinfo=istanbul)
-            req.nudge5_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            req.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
         else:
-            today = datetime.utcnow().date()
             if req.desired_date and req.desired_date != today:
                 if req.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
-                    planned_day = req.desired_date - timedelta(days=settings.nudge5_lead_days)
-                    req.nudge5_planned_at = datetime.combine(planned_day, datetime.min.time()).replace(
-                        hour=10, minute=0, second=0, microsecond=0
-                    )
+                    planned_day_5 = req.desired_date - timedelta(days=settings.nudge5_lead_days)
+                    req.nudge5_planned_at = _istanbul_10_to_utc_naive(planned_day_5)
 
         # ===== NUDGE 6 PLANNING =====
         if settings.nudge6_test_mode:
-            istanbul = ZoneInfo("Europe/Istanbul")
-            local_dt = datetime.combine(planned_day, time(hour=10), tzinfo=istanbul)
-            req.nudge6_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            req.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
         else:
-            today = datetime.utcnow().date()
             if req.desired_date and req.desired_date != today:
                 if req.desired_date >= (today + timedelta(days=settings.nudge6_lead_days)):
                     planned_day_6 = req.desired_date - timedelta(days=settings.nudge6_lead_days)
-                    req.nudge6_planned_at = datetime.combine(planned_day_6, datetime.min.time()).replace(
-                        hour=10, minute=0, second=0, microsecond=0
-                    )
+                    req.nudge6_planned_at = _istanbul_10_to_utc_naive(planned_day_6)
 
         # ===== NUDGE 7 PLANNING =====
         if settings.nudge7_test_mode:
             req.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
         else:
             if req.desired_date:
-                istanbul = ZoneInfo("Europe/Istanbul")
-                local_dt = datetime.combine(req.desired_date, time(hour=10, minute=0), tzinfo=istanbul)
-                req.nudge7_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+                req.nudge7_planned_at = _istanbul_10_to_utc_naive(req.desired_date)
 
         try:
             await self._requests.create(req)
@@ -202,15 +195,6 @@ class RequestService:
             await self._requests.rollback()
             existing2 = await self._requests.get_by_client_request_id(client_request_id)
             return ConfirmResult(created=False, already_exists=True, crm_request_id=(existing2.crm_request_id if existing2 else None))
-
-        # ===== NUDGE 7 PLANNING =====
-        if settings.nudge7_test_mode:
-            req.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
-        else:
-            if req.desired_date:
-                istanbul = ZoneInfo("Europe/Istanbul")
-                local_dt = datetime.combine(req.desired_date, time(hour=10, minute=0), tzinfo=istanbul)
-                req.nudge7_planned_at = local_dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
         crm = get_crm_client()

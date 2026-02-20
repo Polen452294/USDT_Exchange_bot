@@ -8,21 +8,20 @@ class Settings(BaseSettings):
 
     DB_AUTO_CREATE: bool = True
 
-    nudge1_delay_seconds: int = 1200      # 20 минут
-    nudge2_delay_seconds: int = 900       # 15 минут
-    nudge3_delay_seconds: int = 6000      # 100 минут
+    nudge1_delay_seconds: int = 10      # 20 минут
+    nudge2_delay_seconds: int = 10       # 15 минут
+    nudge3_delay_seconds: int = 10      # 100 минут
     nudge_worker_interval_seconds: int = 5 # обновление дожимов
     nudge4_delay_seconds: int = 86400     # 24 часа
 
-    nudge5_lead_days: int = 14
     nudge5_test_mode: bool = True
     nudge5_test_delay_seconds: int = 10
 
     nudge6_test_mode: bool = True
-    nudge6_test_delay_seconds: int = 30
+    nudge6_test_delay_seconds: int = 20
 
     nudge7_test_mode: bool = True
-    nudge7_test_delay_seconds: int = 10
+    nudge7_test_delay_seconds: int = 30
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
@@ -46,6 +45,22 @@ class Settings(BaseSettings):
     crm_idempotency_header: str = "Idempotency-Key"
     crm_auth_header: str = "Authorization"
     crm_auth_prefix: str = "Bearer"
+
+    ADMIN_IDS: str = ""
+
+    @property
+    def admin_ids(self) -> set[int]:
+        raw = (self.ADMIN_IDS or "").strip()
+        if not raw:
+            return set()
+        parts = [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
+        ids: set[int] = set()
+        for p in parts:
+            try:
+                ids.add(int(p))
+            except Exception:
+                continue
+        return ids
 
     @property
     def db_url(self) -> str:
