@@ -15,7 +15,7 @@ class DraftRepository:
             select(Draft).where(Draft.transport == transport, Draft.peer_id == peer_id)
         )
 
-    async def get_or_create_by_transport_peer_id(
+    async def get_or_create(
         self,
         transport: str,
         peer_id: int,
@@ -38,16 +38,6 @@ class DraftRepository:
         self._session.add(draft)
         await self._session.commit()
         return draft
-
-    async def get_by_user_id(self, telegram_user_id: int) -> Draft | None:
-        return await self.get_by_transport_peer_id("tg", telegram_user_id)
-
-    async def get_or_create(self, telegram_user_id: int) -> Draft:
-        return await self.get_or_create_by_transport_peer_id(
-            "tg",
-            telegram_user_id,
-            telegram_user_id=telegram_user_id,
-        )
 
     async def save(self) -> None:
         await self._session.commit()

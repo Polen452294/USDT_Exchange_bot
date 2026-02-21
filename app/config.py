@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     crm_auth_header: str = "Authorization"
     crm_auth_prefix: str = "Bearer"
 
+    VK_GROUP_TOKEN: str | None = None
+    VK_GROUP_ID: int | None = None
+
     ADMIN_IDS: str = ""
 
     @property
