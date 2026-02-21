@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from app.config import settings
-from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, time, timezone
 from zoneinfo import ZoneInfo
+
+from sqlalchemy.exc import IntegrityError
+
+from app.config import settings
 from app.models import Draft, Request, Direction
 from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
@@ -30,10 +32,12 @@ def _money(x: float) -> str:
 def _new_client_request_id() -> str:
     return uuid.uuid4().hex[:16] + "-" + str(int(datetime.utcnow().timestamp()))
 
+
 def _istanbul_10_to_utc_naive(day) -> datetime:
     istanbul = ZoneInfo("Europe/Istanbul")
     local_dt = datetime.combine(day, time(hour=10, minute=0), tzinfo=istanbul)
     return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+
 
 @dataclass(frozen=True)
 class SummaryResult:
@@ -64,7 +68,10 @@ class RequestService:
         return draft.client_request_id
 
     async def build_summary(self, telegram_user_id: int) -> SummaryResult:
-        draft = await self._drafts.get_by_user_id(telegram_user_id)
+        return await self.build_summary_ctx("tg", telegram_user_id)
+
+    async def build_summary_ctx(self, transport: str, peer_id: int) -> SummaryResult:
+        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
@@ -127,7 +134,24 @@ class RequestService:
         receive_amount: float | None = None,
         summary_text: str | None = None,
     ) -> ConfirmResult:
-        draft = await self._drafts.get_by_user_id(telegram_user_id)
+        return await self.confirm_request_ctx(
+            "tg",
+            telegram_user_id,
+            rate=rate,
+            receive_amount=receive_amount,
+            summary_text=summary_text,
+        )
+
+    async def confirm_request_ctx(
+        self,
+        transport: str,
+        peer_id: int,
+        *,
+        rate: float | None = None,
+        receive_amount: float | None = None,
+        summary_text: str | None = None,
+    ) -> ConfirmResult:
+        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
@@ -141,13 +165,15 @@ class RequestService:
             return ConfirmResult(created=False, already_exists=True, crm_request_id=existing.crm_request_id)
 
         if not rate or not receive_amount or not summary_text:
-            summary = await self.build_summary(telegram_user_id)
+            summary = await self.build_summary_ctx(transport, peer_id)
             rate = summary.rate
             receive_amount = summary.receive_amount
             summary_text = summary.summary_text
 
         req = Request(
-            telegram_user_id=telegram_user_id,
+            transport=transport,
+            peer_id=peer_id,
+            telegram_user_id=(peer_id if transport == "tg" else None),
             client_request_id=client_request_id,
             crm_request_id=None,
             direction=draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction)),
@@ -164,7 +190,6 @@ class RequestService:
 
         today = datetime.utcnow().date()
 
-        # ===== NUDGE 5 PLANNING =====
         if settings.nudge5_test_mode:
             req.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
         else:
@@ -173,7 +198,6 @@ class RequestService:
                     planned_day_5 = req.desired_date - timedelta(days=settings.nudge5_lead_days)
                     req.nudge5_planned_at = _istanbul_10_to_utc_naive(planned_day_5)
 
-        # ===== NUDGE 6 PLANNING =====
         if settings.nudge6_test_mode:
             req.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
         else:
@@ -182,7 +206,6 @@ class RequestService:
                     planned_day_6 = req.desired_date - timedelta(days=settings.nudge6_lead_days)
                     req.nudge6_planned_at = _istanbul_10_to_utc_naive(planned_day_6)
 
-        # ===== NUDGE 7 PLANNING =====
         if settings.nudge7_test_mode:
             req.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
         else:
@@ -194,25 +217,29 @@ class RequestService:
         except IntegrityError:
             await self._requests.rollback()
             existing2 = await self._requests.get_by_client_request_id(client_request_id)
-            return ConfirmResult(created=False, already_exists=True, crm_request_id=(existing2.crm_request_id if existing2 else None))
-
+            return ConfirmResult(
+                created=False,
+                already_exists=True,
+                crm_request_id=(existing2.crm_request_id if existing2 else None),
+            )
 
         crm = get_crm_client()
+        payload = {
+            "client_request_id": client_request_id,
+            "transport": transport,
+            "peer_id": peer_id,
+            "telegram_user_id": (peer_id if transport == "tg" else None),
+            "direction": req.direction.value,
+            "give_amount": req.give_amount,
+            "office_id": req.office_id,
+            "desired_date": req.desired_date.isoformat(),
+            "username": req.username,
+            "rate": req.rate,
+            "receive_amount": req.receive_amount,
+        }
+
         try:
-            crm_resp = await crm.create_request(
-                {
-                    "client_request_id": client_request_id,
-                    "telegram_user_id": telegram_user_id,
-                    "direction": req.direction.value,
-                    "give_amount": req.give_amount,
-                    "office_id": req.office_id,
-                    "desired_date": req.desired_date.isoformat(),
-                    "username": req.username,
-                    "rate": req.rate,
-                    "receive_amount": req.receive_amount,
-                },
-                idempotency_key=client_request_id,
-            )
+            crm_resp = await crm.create_request(payload, idempotency_key=client_request_id)
         except CRMTemporaryError:
             raise
         except CRMPermanentError:

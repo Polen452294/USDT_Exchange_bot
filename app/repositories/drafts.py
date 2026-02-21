@@ -10,20 +10,44 @@ class DraftRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_by_user_id(self, telegram_user_id: int) -> Draft | None:
+    async def get_by_transport_peer_id(self, transport: str, peer_id: int) -> Draft | None:
         return await self._session.scalar(
-            select(Draft).where(Draft.telegram_user_id == telegram_user_id)
+            select(Draft).where(Draft.transport == transport, Draft.peer_id == peer_id)
         )
 
-    async def get_or_create(self, telegram_user_id: int) -> Draft:
-        draft = await self.get_by_user_id(telegram_user_id)
+    async def get_or_create_by_transport_peer_id(
+        self,
+        transport: str,
+        peer_id: int,
+        *,
+        telegram_user_id: int | None = None,
+    ) -> Draft:
+        draft = await self.get_by_transport_peer_id(transport, peer_id)
         if draft:
+            if telegram_user_id is not None and draft.telegram_user_id is None:
+                draft.telegram_user_id = telegram_user_id
+                await self._session.commit()
             return draft
 
-        draft = Draft(telegram_user_id=telegram_user_id, last_step="start")
+        draft = Draft(
+            transport=transport,
+            peer_id=peer_id,
+            telegram_user_id=telegram_user_id,
+            last_step="start",
+        )
         self._session.add(draft)
         await self._session.commit()
         return draft
+
+    async def get_by_user_id(self, telegram_user_id: int) -> Draft | None:
+        return await self.get_by_transport_peer_id("tg", telegram_user_id)
+
+    async def get_or_create(self, telegram_user_id: int) -> Draft:
+        return await self.get_or_create_by_transport_peer_id(
+            "tg",
+            telegram_user_id,
+            telegram_user_id=telegram_user_id,
+        )
 
     async def save(self) -> None:
         await self._session.commit()

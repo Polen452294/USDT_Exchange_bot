@@ -34,7 +34,7 @@ async def enter_date_manual(message: Message, state: FSMContext, session: AsyncS
     tg_id = message.from_user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
     if draft is None:
-        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
         session.add(draft)
 
     draft.desired_date = d
@@ -51,7 +51,7 @@ async def enter_date_default(cb: CallbackQuery, state: FSMContext, session: Asyn
     tg_id = cb.from_user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
     if draft is None:
-        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
         session.add(draft)
 
     draft.desired_date = date.today()
@@ -65,7 +65,7 @@ async def go_username_step(message: Message, user: User, state: FSMContext, sess
     tg_id = user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
     if draft is None:
-        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
         session.add(draft)
         await session.commit()
 

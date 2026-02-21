@@ -31,7 +31,11 @@ class Draft(Base):
     __tablename__ = "drafts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    transport: Mapped[str] = mapped_column(String(16), default="tg", index=True)
+    peer_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    telegram_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
 
     direction: Mapped[Optional[Direction]] = mapped_column(Enum(Direction), nullable=True)
     give_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -70,14 +74,20 @@ class Draft(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (UniqueConstraint("telegram_user_id", name="uq_drafts_telegram_user_id"),)
+    __table_args__ = (
+        UniqueConstraint("transport", "peer_id", name="uq_drafts_transport_peer_id"),
+    )
 
 
 class Request(Base):
     __tablename__ = "requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    transport: Mapped[str] = mapped_column(String(16), default="tg", index=True)
+    peer_id: Mapped[int] = mapped_column(BigInteger, index=True)
+
+    telegram_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
 
     client_request_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     crm_request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

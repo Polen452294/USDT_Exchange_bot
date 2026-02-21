@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import logging
-from datetime import datetime, timedelta, date
-from datetime import timezone
-from zoneinfo import ZoneInfo
 import asyncio
+import logging
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from aiogram import Bot
 from sqlalchemy import select
 
-from app.config import Settings
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
 from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5, kb_nudge6, kb_nudge7
@@ -43,15 +42,12 @@ NUDGE5_TEXT = (
     "Подтвердите, пожалуйста — всё ещё актуально?"
 )
 
-NUDGE6_TEXT = (
-    "У нас есть для вас специальное предложение для заявки. Хотите узнать?"
-)
+NUDGE6_TEXT = "У нас есть для вас специальное предложение для заявки. Хотите узнать?"
 
 NUDGE7_TEXT = (
     "Доброе утро! Сегодня у вас запланирован обмен: (данные заявки). "
     "Хотите, чтобы менеджер с вами?"
 )
-
 
 STEPS_FOR_NUDGE2 = [
     "amount_wait",
@@ -81,7 +77,7 @@ def _crm_contacted(payload: dict) -> bool:
     return False
 
 
-def _today_istanbul() -> datetime.date:
+def _today_istanbul():
     ist = ZoneInfo("Europe/Istanbul")
     return datetime.now(tz=ist).date()
 
@@ -91,33 +87,10 @@ def _crm_terminal(payload: dict) -> bool:
     return status in _TERMINAL_STATUSES
 
 
-def _format_request_block(req: Request) -> str:
-    try:
-        direction = req.direction.value
-    except Exception:
-        direction = str(req.direction)
-
-    office = getattr(req, "office_id", None) or getattr(req, "office", None) or "-"
-    desired = req.desired_date.strftime("%d.%m.%Y") if req.desired_date else "-"
-
-    give_amount = getattr(req, "give_amount", None)
-    receive_amount = getattr(req, "receive_amount", None)
-    rate = getattr(req, "rate", None)
-
-    return (
-        "Детали заявки:\n"
-        f"• Направление: {direction}\n"
-        f"• Сумма: {give_amount}\n"
-        f"• Офис: {office}\n"
-        f"• Дата: {desired}\n"
-        f"• Курс: {rate}\n"
-        f"• Получаете: {receive_amount}"
-    )
-
-
 class NudgeService:
-    def __init__(self, bot: Bot) -> None:
+    def __init__(self, bot: Bot, *, vk_sender=None) -> None:
         self.bot = bot
+        self.vk_sender = vk_sender
 
     async def tick(self) -> None:
         await self._check_nudge1()
@@ -128,16 +101,24 @@ class NudgeService:
         await self._check_nudge6()
         await self._check_nudge7()
 
+    async def _send(self, transport: str, peer_id: int, text: str, *, reply_markup=None) -> None:
+        if transport == "tg":
+            await self.bot.send_message(chat_id=peer_id, text=text, reply_markup=reply_markup)
+            return
+
+        if transport == "vk":
+            if self.vk_sender is None:
+                raise RuntimeError("vk_sender is not configured")
+            await self.vk_sender(peer_id, text)
+            return
+
+        raise ValueError(f"unsupported transport: {transport}")
+
     async def _check_nudge1(self) -> None:
         now = datetime.utcnow()
-
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(
-                    Request.id,
-                    Request.telegram_user_id,
-                    Request.crm_request_id,
-                )
+                select(Request.id, Request.transport, Request.peer_id, Request.crm_request_id)
                 .where(Request.nudge1_answer.is_(None))
                 .where(Request.nudge1_sent_at.is_(None))
                 .where(Request.nudge1_planned_at.is_not(None))
@@ -146,18 +127,13 @@ class NudgeService:
                 .limit(50)
                 .with_for_update(skip_locked=True)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n1 candidates=%d", len(rows))
-
             crm = get_crm_client()
 
-            for req_id, uid, crm_request_id in rows:
-                uid = int(uid)
-
+            for req_id, transport, peer_id, crm_request_id in rows:
                 try:
                     req = await session.get(Request, req_id)
                     if not req:
@@ -177,71 +153,49 @@ class NudgeService:
                     req.nudge1_sent_at = datetime.utcnow()
                     await session.commit()
 
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE1_TEXT,
-                        reply_markup=kb_nudge1(),
-                    )
-
-                    log.info("n1 sent: uid=%s req_id=%s", uid, req_id)
+                    await self._send(str(transport), int(peer_id), NUDGE1_TEXT, reply_markup=kb_nudge1())
 
                 except Exception:
                     await session.rollback()
-                    log.exception("n1 send failed: uid=%s req_id=%s", uid, req_id)
-
+                    log.exception("n1 send failed: req_id=%s", req_id)
 
     async def _check_nudge2(self) -> None:
         now = datetime.utcnow()
-
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(
-                    Draft.id,
-                    Draft.telegram_user_id,
-                    Draft.last_step,
-                )
+                select(Draft.id, Draft.transport, Draft.peer_id, Draft.last_step)
                 .where(Draft.last_step.in_(STEPS_FOR_NUDGE2))
                 .where(Draft.give_amount.is_not(None))
                 .where(Draft.nudge2_answer.is_(None))
                 .where(Draft.nudge2_sent_at.is_(None))
                 .where(Draft.nudge2_planned_at.is_not(None))
                 .where(Draft.nudge2_planned_at <= now)
+                .limit(50)
             )
-
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n2 candidates=%d", len(rows))
-
-            for draft_id, uid, last_step in rows:
-                uid = int(uid)
-
+            for draft_id, transport, peer_id, last_step in rows:
                 try:
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE2_TEXT,
-                        reply_markup=kb_nudge2(),
-                    )
+                    await self._send(str(transport), int(peer_id), NUDGE2_TEXT, reply_markup=kb_nudge2())
 
                     draft = await session.get(Draft, draft_id)
                     if draft:
                         draft.nudge2_sent_at = datetime.utcnow()
                         await session.commit()
 
-                    log.info("n2 sent: uid=%s step=%s", uid, last_step)
+                    log.info("n2 sent: transport=%s peer_id=%s step=%s", transport, peer_id, last_step)
 
                 except Exception:
                     await session.rollback()
-                    log.exception("n2 send failed: uid=%s", uid)
+                    log.exception("n2 send failed: transport=%s peer_id=%s", transport, peer_id)
 
     async def _check_nudge3(self) -> None:
         now = datetime.utcnow()
-
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(Draft.id, Draft.telegram_user_id, Draft.client_request_id)
+                select(Draft.id, Draft.transport, Draft.peer_id, Draft.client_request_id)
                 .where(Draft.step6_at.is_not(None))
                 .where(Draft.nudge3_planned_at.is_not(None))
                 .where(Draft.nudge3_planned_at <= now)
@@ -249,16 +203,11 @@ class NudgeService:
                 .where(Draft.nudge3_answer.is_(None))
                 .limit(50)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n3 candidates=%d", len(rows))
-
-            for draft_id, uid, client_request_id in rows:
-                uid = int(uid)
-
+            for draft_id, transport, peer_id, client_request_id in rows:
                 try:
                     if client_request_id:
                         req_exists = await session.scalar(
@@ -272,29 +221,22 @@ class NudgeService:
                                 await session.commit()
                             continue
 
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE3_TEXT,
-                        reply_markup=kb_nudge3(),
-                    )
+                    await self._send(str(transport), int(peer_id), NUDGE3_TEXT, reply_markup=kb_nudge3())
 
                     draft = await session.get(Draft, draft_id)
                     if draft and draft.nudge3_sent_at is None:
                         draft.nudge3_sent_at = datetime.utcnow()
                         await session.commit()
 
-                    log.info("n3 sent: uid=%s draft_id=%s", uid, draft_id)
-
                 except Exception:
                     await session.rollback()
-                    log.exception("n3 send failed: uid=%s", uid)
+                    log.exception("n3 send failed: transport=%s peer_id=%s", transport, peer_id)
 
     async def _check_nudge4(self) -> None:
         now = datetime.utcnow()
-
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(Draft.id, Draft.telegram_user_id)
+                select(Draft.id, Draft.transport, Draft.peer_id)
                 .where(Draft.nudge2_answer == "later")
                 .where(Draft.nudge4_planned_at.is_not(None))
                 .where(Draft.nudge4_planned_at <= now)
@@ -302,32 +244,22 @@ class NudgeService:
                 .where(Draft.nudge4_answer.is_(None))
                 .limit(50)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n4 candidates=%d", len(rows))
-
-            for draft_id, uid in rows:
-                uid = int(uid)
+            for draft_id, transport, peer_id in rows:
                 try:
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE4_TEXT,
-                        reply_markup=kb_nudge4(),
-                    )
+                    await self._send(str(transport), int(peer_id), NUDGE4_TEXT, reply_markup=kb_nudge4())
 
                     draft = await session.get(Draft, draft_id)
                     if draft and draft.nudge4_sent_at is None:
                         draft.nudge4_sent_at = datetime.utcnow()
                         await session.commit()
 
-                    log.info("n4 sent: uid=%s draft_id=%s", uid, draft_id)
-
                 except Exception:
                     await session.rollback()
-                    log.exception("n4 send failed: uid=%s", uid)
+                    log.exception("n4 send failed: transport=%s peer_id=%s", transport, peer_id)
 
     async def _check_nudge5(self) -> None:
         now = datetime.utcnow()
@@ -335,11 +267,7 @@ class NudgeService:
 
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(
-                    Request.id,
-                    Request.telegram_user_id,
-                    Request.crm_request_id,
-                )
+                select(Request.id, Request.transport, Request.peer_id, Request.crm_request_id)
                 .where(Request.nudge5_planned_at.is_not(None))
                 .where(Request.nudge5_planned_at <= now)
                 .where(Request.nudge5_sent_at.is_(None))
@@ -347,24 +275,15 @@ class NudgeService:
                 .order_by(Request.id.asc())
                 .limit(50)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n5 candidates=%d", len(rows))
-
             crm = get_crm_client()
 
-            for req_id, uid, crm_request_id in rows:
-                uid = int(uid)
-
-                log.info("n5 debug: start req_id=%s uid=%s crm_request_id=%s", req_id, uid, crm_request_id)
-
+            for req_id, transport, peer_id, crm_request_id in rows:
                 try:
                     req = await session.get(Request, req_id)
-                    log.info("n5 debug: request loaded req_id=%s", req_id)
-
                     if req is None:
                         continue
 
@@ -372,145 +291,65 @@ class NudgeService:
                         req.nudge5_sent_at = now
                         req.nudge5_answer = "skip_date"
                         await session.commit()
-                        log.info("n5 debug: skipped by date req_id=%s", req_id)
                         continue
 
                     if crm_request_id:
-                        log.info("n5 debug: before crm.check_status req_id=%s", req_id)
-                        st = await asyncio.wait_for(
-                            crm.check_status(str(crm_request_id)),
-                            timeout=15,
-                        )
-                        log.info("n5 debug: after crm.check_status req_id=%s", req_id)
+                        st = await asyncio.wait_for(crm.check_status(str(crm_request_id)), timeout=15)
+                        if isinstance(st, dict) and _crm_terminal(st):
+                            req.nudge5_sent_at = now
+                            req.nudge5_answer = "skip_terminal"
+                            await session.commit()
+                            continue
 
-                        if isinstance(st, dict):
-                            status = str(st.get("status") or "").lower()
-                            if status in {"done", "completed", "paid", "fixed", "closed"}:
-                                req.nudge5_sent_at = now
-                                req.nudge5_answer = "skip_terminal"
-                                await session.commit()
-                                log.info("n5 debug: skipped by terminal status req_id=%s", req_id)
-                                continue
+                    await self._send(str(transport), int(peer_id), NUDGE5_TEXT, reply_markup=kb_nudge5())
 
-                    try:
-                        direction = req.direction.value
-                    except Exception:
-                        direction = str(req.direction)
+                    req.nudge5_sent_at = datetime.utcnow()
+                    await session.commit()
 
-                    if direction == "USDT_TO_CASH":
-                        give_currency = "USDT"
-                        receive_currency = "наличные"
-                    else:
-                        give_currency = "наличные"
-                        receive_currency = "USDT"
-
-                    request_block = (
-                        f"➔ Вы отдаёте: {req.give_amount} {give_currency}\n"
-                        f"➔ Офис: {req.office_id}\n"
-                        f"➔ Дата получения: {req.desired_date.strftime('%d.%m.%Y')}\n"
-                        f"➔ Текущий курс: {req.rate}\n"
-                        f"➔ Вы получаете: {req.receive_amount} {receive_currency}"
-                    )
-
-                    text = (
-                        "Недавно вы оставляли заявку на обмен:\n\n"
-                        f"{request_block}\n\n"
-                        "Мы готовы помочь вам, если задача актуальна.\n"
-                        "Хотите, чтобы наш менеджер связался с вами напрямую и обсудил условия?"
-                    )
-
-                    log.info("n5 debug: before bot.send_message req_id=%s uid=%s", req_id, uid)
-
-                    await asyncio.wait_for(
-                        self.bot.send_message(
-                            chat_id=uid,
-                            text=text,
-                            reply_markup=kb_nudge5(req_id),
-                        ),
-                        timeout=15,
-                    )
-
-                    log.info("n5 debug: after bot.send_message req_id=%s uid=%s", req_id, uid)
-
-                    if req.nudge5_sent_at is None:
-                        req.nudge5_sent_at = datetime.utcnow()
-                        await session.commit()
-
-                    log.info("n5 sent: uid=%s req_id=%s", uid, req_id)
-
-                except Exception as e:
+                except Exception:
                     await session.rollback()
-                    log.exception("n5 send failed: uid=%s req_id=%s err=%r", uid, req_id, e)
+                    log.exception("n5 send failed: transport=%s peer_id=%s", transport, peer_id)
 
     async def _check_nudge6(self) -> None:
         now = datetime.utcnow()
-        today = now.date()
-
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(
-                    Request.id,
-                    Request.telegram_user_id,
-                    Request.crm_request_id,
-                )
+                select(Request.id, Request.transport, Request.peer_id, Request.crm_request_id)
                 .where(Request.nudge6_planned_at.is_not(None))
                 .where(Request.nudge6_planned_at <= now)
                 .where(Request.nudge6_sent_at.is_(None))
                 .where(Request.nudge6_answer.is_(None))
-                .where(Request.nudge5_sent_at.is_not(None))
-                .where(Request.nudge5_answer.is_(None))
                 .order_by(Request.id.asc())
                 .limit(50)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
-            log.info("n6 candidates=%d", len(rows))
-
             crm = get_crm_client()
 
-            for req_id, uid, crm_request_id in rows:
-                uid = int(uid)
-
+            for req_id, transport, peer_id, crm_request_id in rows:
                 try:
                     req = await session.get(Request, req_id)
                     if req is None:
                         continue
 
-                    if req.desired_date is None or req.desired_date == today:
-                        req.nudge6_sent_at = now
-                        req.nudge6_answer = "skip_date"
-                        await session.commit()
-                        continue
-
                     if crm_request_id:
-                        st = await crm.check_status(str(crm_request_id))
-                        if isinstance(st, dict):
-                            status = str(st.get("status") or "").strip().lower()
-                            if status in _TERMINAL_STATUSES:
-                                req.nudge6_sent_at = now
-                                req.nudge6_answer = "skip_terminal"
-                                await session.commit()
-                                continue
+                        st = await asyncio.wait_for(crm.check_status(str(crm_request_id)), timeout=15)
+                        if isinstance(st, dict) and _crm_terminal(st):
+                            req.nudge6_sent_at = now
+                            req.nudge6_answer = "skip_terminal"
+                            await session.commit()
+                            continue
 
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=NUDGE6_TEXT,
-                        reply_markup=kb_nudge6(req.id),
-                    )
+                    await self._send(str(transport), int(peer_id), NUDGE6_TEXT, reply_markup=kb_nudge6())
 
-                    if req.nudge6_sent_at is None:
-                        req.nudge6_sent_at = datetime.utcnow()
-                        await session.commit()
-
-                    log.info("n6 sent: uid=%s req_id=%s", uid, req_id)
+                    req.nudge6_sent_at = datetime.utcnow()
+                    await session.commit()
 
                 except Exception:
                     await session.rollback()
-                    log.exception("n6 send failed: uid=%s req_id=%s", uid, req_id)
-
+                    log.exception("n6 send failed: transport=%s peer_id=%s", transport, peer_id)
 
     async def _check_nudge7(self) -> None:
         now = datetime.utcnow()
@@ -518,7 +357,7 @@ class NudgeService:
 
         async with AsyncSessionLocal() as session:
             stmt = (
-                select(Request.id, Request.telegram_user_id, Request.crm_request_id)
+                select(Request.id, Request.transport, Request.peer_id, Request.crm_request_id, Request.desired_date)
                 .where(Request.nudge7_planned_at.is_not(None))
                 .where(Request.nudge7_planned_at <= now)
                 .where(Request.nudge7_sent_at.is_(None))
@@ -526,50 +365,37 @@ class NudgeService:
                 .order_by(Request.id.asc())
                 .limit(50)
             )
-
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
 
             crm = get_crm_client()
 
-            for req_id, uid, crm_request_id in rows:
-                uid = int(uid)
-
+            for req_id, transport, peer_id, crm_request_id, desired_date in rows:
                 try:
                     req = await session.get(Request, req_id)
                     if req is None:
                         continue
 
-                    if req.desired_date != today_ist:
+                    if desired_date and desired_date != today_ist:
                         req.nudge7_sent_at = now
                         req.nudge7_answer = "skip_not_today"
                         await session.commit()
                         continue
 
                     if crm_request_id:
-                        st = await crm.check_status(str(crm_request_id))
+                        st = await asyncio.wait_for(crm.check_status(str(crm_request_id)), timeout=15)
                         if isinstance(st, dict) and _crm_terminal(st):
                             req.nudge7_sent_at = now
                             req.nudge7_answer = "skip_terminal"
                             await session.commit()
                             continue
 
-                    text = (
-                        "Доброе утро! Сегодня у вас запланирован обмен:\n\n"
-                        f"{_format_request_block(req)}\n\n"
-                        "Хотите, чтобы менеджер с вами?"
-                    )
-
-                    await self.bot.send_message(
-                        chat_id=uid,
-                        text=text,
-                        reply_markup=kb_nudge7(req.id),
-                    )
+                    await self._send(str(transport), int(peer_id), NUDGE7_TEXT, reply_markup=kb_nudge7())
 
                     req.nudge7_sent_at = datetime.utcnow()
                     await session.commit()
 
                 except Exception:
                     await session.rollback()
-                    log.exception("n7 send failed: uid=%s req_id=%s", uid, req_id)
+                    log.exception("n7 send failed: transport=%s peer_id=%s", transport, peer_id)

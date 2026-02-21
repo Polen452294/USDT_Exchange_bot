@@ -34,7 +34,7 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
     tg_id = message.from_user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
     if draft is None:
-        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
         session.add(draft)
     else:
         draft.direction = None
@@ -77,7 +77,7 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     tg_id = cb.from_user.id
     draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
     if draft is None:
-        draft = Draft(telegram_user_id=tg_id, last_step="start")
+        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
         session.add(draft)
 
     draft.direction = direction
