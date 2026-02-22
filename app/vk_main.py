@@ -1,61 +1,32 @@
-import os
 import asyncio
 import logging
 
-import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-
 from app.config import settings
-from app.vk.router import VKRouter
+from app.db import engine
+from app.models import Base
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("vk")
+logger = logging.getLogger("vk")
 
 
-def main():
-    token = settings.VK_GROUP_TOKEN
-    group_id = settings.VK_GROUP_ID
+async def ensure_db_schema() -> None:
+    import app.models  # noqa: F401
 
-    if not token or not group_id:
-        raise RuntimeError("VK_GROUP_TOKEN and VK_GROUP_ID are required")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    vk_session = vk_api.VkApi(token=token)
-    api = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, group_id)
 
-    router = VKRouter()
+async def process() -> None:
+    if getattr(settings, "DB_AUTO_CREATE", False):
+        await ensure_db_schema()
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    from app.vk.bot import run_vk_bot
 
-    log.info("VK bot started, group_id=%s", group_id)
+    await run_vk_bot()
 
-    for event in longpoll.listen():
-        if event.type != VkBotEventType.MESSAGE_NEW:
-            continue
 
-        msg = event.object.message
-
-        peer_id = int(msg["peer_id"])
-        from_id = int(msg["from_id"])
-        text = msg.get("text", "")
-
-        log.info("VK message: peer_id=%s from_id=%s text=%r", peer_id, from_id, text)
-
-        if peer_id != from_id:
-            continue
-
-        async def process():
-            response = await router.handle(peer_id, from_id, text)
-            if response:
-                await asyncio.to_thread(
-                    api.messages.send,
-                    peer_id=peer_id,
-                    random_id=0,
-                    message=response,
-                )
-
-        loop.run_until_complete(process())
+def main() -> None:
+    asyncio.run(process())
 
 
 if __name__ == "__main__":

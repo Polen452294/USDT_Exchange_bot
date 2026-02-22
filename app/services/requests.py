@@ -112,7 +112,8 @@ class RequestService:
             f"➔ Текущий курс: {rate}\n"
             f"➔ Вы получаете: {_money(receive_amount)} {recv_currency}\n\n"
             f"{DISCLAIMER}\n\n"
-            "Всё верно?"
+            "Всё верно? Нажмите «Да, все отлично» и я создам заявку.\n"
+            "Если хотите что-то поправить – нажмите «Нет, хочу внести изменения»."
         )
 
         draft.last_step = "summary"
