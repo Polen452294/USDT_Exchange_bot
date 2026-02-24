@@ -17,6 +17,19 @@ from sqlalchemy import select
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
 try:
+    from app.vk.keyboards import (
+        nudge1_keyboard as vk_kb_n1,
+        nudge2_keyboard as vk_kb_n2,
+        nudge3_keyboard as vk_kb_n3,
+        nudge4_keyboard as vk_kb_n4,
+        nudge5_keyboard as vk_kb_n5,
+        nudge6_keyboard as vk_kb_n6,
+        nudge7_keyboard as vk_kb_n7,
+    )
+except Exception:
+    vk_kb_n1 = vk_kb_n2 = vk_kb_n3 = vk_kb_n4 = vk_kb_n5 = vk_kb_n6 = vk_kb_n7 = None
+
+try:
     from app.keyboards import (
         kb_nudge1,
         kb_nudge2,
@@ -124,7 +137,7 @@ class NudgeService:
         await self._check_nudge6(transport_filter=transport_filter)
         await self._check_nudge7(transport_filter=transport_filter)
 
-    async def _send(self, transport: str, peer_id: int, text: str, *, reply_markup=None) -> None:
+    async def _send(self, transport: str, peer_id: int, text: str, reply_markup=None) -> None:
         if transport == "tg":
             if self.bot is None:
                 raise RuntimeError("tg bot is not configured")
@@ -134,8 +147,9 @@ class NudgeService:
         if transport == "vk":
             if self.vk_sender is None:
                 raise RuntimeError("vk_sender is not configured")
-            log.info("SEND: transport=%s peer_id=%s", transport, peer_id)
-            await self.vk_sender(peer_id, text)
+
+            vk_keyboard = reply_markup if isinstance(reply_markup, str) else None
+            await self.vk_sender(peer_id, text, keyboard=vk_keyboard)
             return
 
         raise ValueError(f"unsupported transport: {transport}")
@@ -179,7 +193,13 @@ class NudgeService:
                             continue
 
                     # 1) отправляем
-                    await self._send(str(transport), int(peer_id), NUDGE1_TEXT, reply_markup=kb_nudge1())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n1 is not None:
+                        markup = vk_kb_n1()
+                    else:
+                        markup = kb_nudge1()
+
+                    await self._send(str(transport), int(peer_id), NUDGE1_TEXT, reply_markup=markup)
 
                     # 2) фиксируем как отправленный только после успеха
                     req.nudge1_sent_at = datetime.utcnow()
@@ -211,7 +231,13 @@ class NudgeService:
 
             for draft_id, transport, peer_id, last_step in rows:
                 try:
-                    await self._send(str(transport), int(peer_id), NUDGE2_TEXT, reply_markup=kb_nudge2())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n2 is not None:
+                        markup = vk_kb_n2()
+                    else:
+                        markup = kb_nudge2()
+
+                    await self._send(str(transport), int(peer_id), NUDGE2_TEXT, reply_markup=markup)
 
                     draft = await session.get(Draft, draft_id)
                     if draft:
@@ -257,7 +283,12 @@ class NudgeService:
                                 await session.commit()
                             continue
 
-                    await self._send(str(transport), int(peer_id), NUDGE3_TEXT, reply_markup=kb_nudge3())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n3 is not None:
+                        markup = vk_kb_n3()
+                    else:
+                        markup = kb_nudge3()
+                    await self._send(str(transport), int(peer_id), NUDGE3_TEXT, reply_markup=markup)
 
                     draft = await session.get(Draft, draft_id)
                     if draft and draft.nudge3_sent_at is None:
@@ -289,7 +320,12 @@ class NudgeService:
 
             for draft_id, transport, peer_id in rows:
                 try:
-                    await self._send(str(transport), int(peer_id), NUDGE4_TEXT, reply_markup=kb_nudge4())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n4 is not None:
+                        markup = vk_kb_n4()
+                    else:
+                        markup = kb_nudge4()
+                    await self._send(str(transport), int(peer_id), NUDGE4_TEXT, reply_markup=markup)
 
                     draft = await session.get(Draft, draft_id)
                     if draft and draft.nudge4_sent_at is None:
@@ -343,7 +379,13 @@ class NudgeService:
                             await session.commit()
                             continue
 
-                    await self._send(str(transport), int(peer_id), NUDGE5_TEXT, reply_markup=kb_nudge5())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n5 is not None:
+                        markup = vk_kb_n5()
+                    else:
+                        markup = kb_nudge5()
+
+                    await self._send(str(transport), int(peer_id), NUDGE5_TEXT, reply_markup=markup)
 
                     req.nudge5_sent_at = datetime.utcnow()
                     await session.commit()
@@ -387,7 +429,13 @@ class NudgeService:
                             await session.commit()
                             continue
 
-                    await self._send(str(transport), int(peer_id), NUDGE6_TEXT, reply_markup=kb_nudge6())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n6 is not None:
+                        markup = vk_kb_n6()
+                    else:
+                        markup = kb_nudge6()
+
+                    await self._send(str(transport), int(peer_id), NUDGE6_TEXT, reply_markup=markup)
 
                     req.nudge6_sent_at = datetime.utcnow()
                     await session.commit()
@@ -439,7 +487,13 @@ class NudgeService:
                             await session.commit()
                             continue
 
-                    await self._send(str(transport), int(peer_id), NUDGE7_TEXT, reply_markup=kb_nudge7())
+                    markup = None
+                    if str(transport) == "vk" and vk_kb_n7 is not None:
+                        markup = vk_kb_n7()
+                    else:
+                        markup = kb_nudge7()
+
+                    await self._send(str(transport), int(peer_id), NUDGE7_TEXT, reply_markup=markup)
 
                     req.nudge7_sent_at = datetime.utcnow()
                     await session.commit()

@@ -11,7 +11,7 @@ from app.db import AsyncSessionLocal
 logger = logging.getLogger("vk")
 
 
-def _send(api, peer_id: int, text: str, keyboard: Optional[dict] = None) -> None:
+def _send(api, peer_id: int, text: str, keyboard: Optional[str] = None) -> None:
     params = {"peer_id": peer_id, "message": text, "random_id": 0}
     if keyboard is not None:
         params["keyboard"] = keyboard
@@ -19,12 +19,15 @@ def _send(api, peer_id: int, text: str, keyboard: Optional[dict] = None) -> None
     try:
         api.messages.send(**params)
     except vk_api.exceptions.ApiError as e:
-        code = getattr(e, "code", None)
-        if code == 912:
-            params.pop("keyboard", None)
-            api.messages.send(**params)
-            return
-        raise
+            try:
+                api.messages.send(**params)
+            except vk_api.exceptions.ApiError as e:
+                code = getattr(e, "code", None)
+                if code in (911, 912):
+                    params.pop("keyboard", None)
+                    api.messages.send(**params)
+                    return
+                raise
 
 
 def _vk_profile_url(api, user_id: int) -> str:
@@ -74,6 +77,7 @@ async def run_vk_bot() -> None:
                         pass
 
                     container = _Container()
+                    container.session = session
                     container.drafts_service = draft_service
                     container.requests_service = request_service
 

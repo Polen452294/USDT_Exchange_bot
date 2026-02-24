@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import random
-from typing import Optional
+from typing import Any, Optional
 
 import vk_api
 
 from app.config import settings
 
 
-def _send_sync(peer_id: int, text: str, keyboard: Optional[dict] = None) -> None:
+def _send_sync(peer_id: int, text: str, keyboard: Optional[str] = None) -> None:
     vk_session = vk_api.VkApi(token=settings.VK_TOKEN)
     api = vk_session.get_api()
 
@@ -24,5 +25,5 @@ def _send_sync(peer_id: int, text: str, keyboard: Optional[dict] = None) -> None
     api.messages.send(**params)
 
 
-async def send_vk_message(peer_id: int, text: str) -> None:
-    await asyncio.to_thread(_send_sync, peer_id, text, None)
+async def send_vk_message(peer_id: int, text: str, *, keyboard: str | None = None) -> None:
+    await asyncio.to_thread(_send_sync, peer_id, text, keyboard)

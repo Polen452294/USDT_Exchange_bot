@@ -29,6 +29,39 @@ class DraftService:
         draft.updated_at = datetime.utcnow()
         await self._repo.save()
 
+    async def reset_for_new_request(self, transport: str, peer_id: int) -> None:
+        draft = await self.get(transport, peer_id)
+        if draft is None:
+            draft = Draft(transport=transport, peer_id=peer_id, telegram_user_id=peer_id if transport == "tg" else None)
+            self._session.add(draft)
+
+        draft.direction = None
+        draft.give_amount = None
+        draft.office_id = None
+        draft.desired_date = None
+        draft.username = None
+        draft.client_request_id = None
+
+        # Дожимы draft-уровня (как в TG /start)
+        draft.nudge2_planned_at = None
+        draft.nudge2_sent_at = None
+        draft.nudge2_answer = None
+        draft.nudge2_answered_at = None
+
+        draft.step6_at = None
+        draft.nudge3_planned_at = None
+        draft.nudge3_sent_at = None
+        draft.nudge3_answer = None
+
+        draft.nudge4_planned_at = None
+        draft.nudge4_sent_at = None
+        draft.nudge4_answer = None
+
+        draft.last_step = "start"
+        draft.updated_at = datetime.utcnow()
+
+        await self._drafts.save()
+
     async def set_direction(
         self,
         transport: str,
