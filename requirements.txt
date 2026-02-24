@@ -1,3 +1,4 @@
+aiogram==3.7.0
 vk_api
 SQLAlchemy==2.0.30
 asyncpg==0.29.0

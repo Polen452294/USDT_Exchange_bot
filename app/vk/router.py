@@ -113,7 +113,7 @@ class VKRouter:
                         "➔ выберите офис в Анталье или Стамбуле\n"
                         "➔ выберите желаемую дату сделки\n"
                         "Потом я покажу вам условия обмена и, если вы согласны, попрошу подтвердить их.\n"
-                        "После наш менеджер свяжется с вами в Telegram для обсуждения деталей. Если "
+                        "После наш менеджер свяжется с вами для обсуждения деталей. Если "
                         "нужно быстро задать вопрос — пишите менеджеру напрямую @coinpointlara.\n"
                         "Нажмите кнопку ниже, чтобы начать 👇"
                     ),
@@ -207,7 +207,7 @@ class VKRouter:
                 await draft_service.set_date("vk", peer_id, parsed_day)
                 return VkReply(
                     text=(
-                        "Похоже, у вас в Telegram не указан username – а он нужен, чтобы продолжить наше "
+                        "Похоже, у вас  не указан username – а он нужен, чтобы продолжить наше "
                         "общение. Введите, пожалуйста, ваш username"
                     ),
                     keyboard=next_keyboard(),
@@ -216,7 +216,7 @@ class VKRouter:
             if t_raw == "Далее" and draft is not None and draft.desired_date and not draft.username:
                 return VkReply(
                     text=(
-                        "Похоже, у вас в Telegram не указан username – а он нужен, чтобы продолжить наше "
+                        "Похоже, у вас не указан username – а он нужен, чтобы продолжить наше "
                         "общение. Введите, пожалуйста, ваш username"
                     ),
                     keyboard=next_keyboard(),
@@ -233,11 +233,11 @@ class VKRouter:
                 res = await request_service.confirm_request_ctx("vk", peer_id)
                 if res.already_exists:
                     return VkReply(
-                        text="Готово ✅ Заявка уже была создана. Менеджер свяжется с вами в Telegram, как только возьмёт её в работу.",
+                        text="Готово ✅ Заявка уже была создана. Менеджер свяжется с вами, как только возьмёт её в работу.",
                         keyboard=main_menu_keyboard(),
                     )
                 return VkReply(
-                    text="Готово ✅ Заявка создана. Менеджер свяжется с вами в Telegram, как только возьмёт её в работу.",
+                    text="Готово ✅ Заявка создана. Менеджер свяжется с вами, как только возьмёт её в работу.",
                     keyboard=main_menu_keyboard(),
                 )
 

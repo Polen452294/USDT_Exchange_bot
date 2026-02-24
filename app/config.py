@@ -8,20 +8,30 @@ class Settings(BaseSettings):
 
     DB_AUTO_CREATE: bool = True
 
-    nudge1_delay_seconds: int = 10      # 20 минут
-    nudge2_delay_seconds: int = 10       # 15 минут
-    nudge3_delay_seconds: int = 10      # 100 минут
-    nudge_worker_interval_seconds: int = 5 # обновление дожимов
-    nudge4_delay_seconds: int = 86400     # 24 часа
+    # обновление дожимов (воркер)
+    nudge_worker_interval_seconds: int = 5
 
+    # базовые задержки (если какой-то дожим не имеет отдельного test_mode)
+    nudge1_delay_seconds: int = 15
+    nudge2_delay_minutes: int = 20
+    nudge3_delay_seconds: int = 45
+    nudge4_delay_seconds: int = 90
+
+    # N2
+    nudge2_test_mode: bool = True
+    nudge2_test_delay_seconds: int = 25
+
+    # N5
     nudge5_test_mode: bool = True
-    nudge5_test_delay_seconds: int = 10
+    nudge5_test_delay_seconds: int = 60
 
+    # N6
     nudge6_test_mode: bool = True
-    nudge6_test_delay_seconds: int = 20
+    nudge6_test_delay_seconds: int = 90
 
+    # N7
     nudge7_test_mode: bool = True
-    nudge7_test_delay_seconds: int = 30
+    nudge7_test_delay_seconds: int = 120
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432

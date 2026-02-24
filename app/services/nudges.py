@@ -2,15 +2,38 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
+from typing import Any
 
-from aiogram import Bot
+try:
+    from aiogram import Bot  # type: ignore
+except Exception:
+    Bot = Any  # type: ignore
+
 from sqlalchemy import select
 
 from app.db import AsyncSessionLocal
 from app.infrastructure.crm_client import get_crm_client
-from app.keyboards import kb_nudge1, kb_nudge2, kb_nudge3, kb_nudge4, kb_nudge5, kb_nudge6, kb_nudge7
+try:
+    from app.keyboards import (
+        kb_nudge1,
+        kb_nudge2,
+        kb_nudge3,
+        kb_nudge4,
+        kb_nudge5,
+        kb_nudge6,
+        kb_nudge7,
+    )
+except Exception:
+    def kb_nudge1(): return None
+    def kb_nudge2(): return None
+    def kb_nudge3(): return None
+    def kb_nudge4(): return None
+    def kb_nudge5(): return None
+    def kb_nudge6(): return None
+    def kb_nudge7(): return None
 from app.models import Draft, Request
 
 log = logging.getLogger("nudges")
@@ -88,33 +111,36 @@ def _crm_terminal(payload: dict) -> bool:
 
 
 class NudgeService:
-    def __init__(self, bot: Bot, *, vk_sender=None) -> None:
+    def __init__(self, bot: Bot | None = None, *, vk_sender=None) -> None:
         self.bot = bot
         self.vk_sender = vk_sender
 
-    async def tick(self) -> None:
-        await self._check_nudge1()
-        await self._check_nudge2()
-        await self._check_nudge3()
-        await self._check_nudge4()
-        await self._check_nudge5()
-        await self._check_nudge6()
-        await self._check_nudge7()
+    async def tick(self, *, transport_filter: str | None = None) -> None:
+        await self._check_nudge1(transport_filter=transport_filter)
+        await self._check_nudge2(transport_filter=transport_filter)
+        await self._check_nudge3(transport_filter=transport_filter)
+        await self._check_nudge4(transport_filter=transport_filter)
+        await self._check_nudge5(transport_filter=transport_filter)
+        await self._check_nudge6(transport_filter=transport_filter)
+        await self._check_nudge7(transport_filter=transport_filter)
 
     async def _send(self, transport: str, peer_id: int, text: str, *, reply_markup=None) -> None:
         if transport == "tg":
+            if self.bot is None:
+                raise RuntimeError("tg bot is not configured")
             await self.bot.send_message(chat_id=peer_id, text=text, reply_markup=reply_markup)
             return
 
         if transport == "vk":
             if self.vk_sender is None:
                 raise RuntimeError("vk_sender is not configured")
+            log.info("SEND: transport=%s peer_id=%s", transport, peer_id)
             await self.vk_sender(peer_id, text)
             return
 
         raise ValueError(f"unsupported transport: {transport}")
 
-    async def _check_nudge1(self) -> None:
+    async def _check_nudge1(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
             stmt = (
@@ -125,8 +151,10 @@ class NudgeService:
                 .where(Request.nudge1_planned_at <= now)
                 .order_by(Request.id.asc())
                 .limit(50)
-                .with_for_update(skip_locked=True)
             )
+            if transport_filter:
+                stmt = stmt.where(Request.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -150,16 +178,18 @@ class NudgeService:
                             await session.commit()
                             continue
 
+                    # 1) отправляем
+                    await self._send(str(transport), int(peer_id), NUDGE1_TEXT, reply_markup=kb_nudge1())
+
+                    # 2) фиксируем как отправленный только после успеха
                     req.nudge1_sent_at = datetime.utcnow()
                     await session.commit()
 
-                    await self._send(str(transport), int(peer_id), NUDGE1_TEXT, reply_markup=kb_nudge1())
-
                 except Exception:
                     await session.rollback()
-                    log.exception("n1 send failed: req_id=%s", req_id)
+                    log.exception("n1 send failed: req_id=%s transport=%s peer_id=%s", req_id, transport, peer_id)
 
-    async def _check_nudge2(self) -> None:
+    async def _check_nudge2(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
             stmt = (
@@ -172,6 +202,9 @@ class NudgeService:
                 .where(Draft.nudge2_planned_at <= now)
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Draft.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -191,7 +224,7 @@ class NudgeService:
                     await session.rollback()
                     log.exception("n2 send failed: transport=%s peer_id=%s", transport, peer_id)
 
-    async def _check_nudge3(self) -> None:
+    async def _check_nudge3(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
             stmt = (
@@ -203,6 +236,9 @@ class NudgeService:
                 .where(Draft.nudge3_answer.is_(None))
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Draft.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -232,7 +268,7 @@ class NudgeService:
                     await session.rollback()
                     log.exception("n3 send failed: transport=%s peer_id=%s", transport, peer_id)
 
-    async def _check_nudge4(self) -> None:
+    async def _check_nudge4(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
             stmt = (
@@ -244,6 +280,9 @@ class NudgeService:
                 .where(Draft.nudge4_answer.is_(None))
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Draft.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -261,7 +300,7 @@ class NudgeService:
                     await session.rollback()
                     log.exception("n4 send failed: transport=%s peer_id=%s", transport, peer_id)
 
-    async def _check_nudge5(self) -> None:
+    async def _check_nudge5(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         today = now.date()
 
@@ -275,6 +314,9 @@ class NudgeService:
                 .order_by(Request.id.asc())
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Request.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -310,7 +352,7 @@ class NudgeService:
                     await session.rollback()
                     log.exception("n5 send failed: transport=%s peer_id=%s", transport, peer_id)
 
-    async def _check_nudge6(self) -> None:
+    async def _check_nudge6(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
             stmt = (
@@ -322,6 +364,9 @@ class NudgeService:
                 .order_by(Request.id.asc())
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Request.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return
@@ -351,7 +396,7 @@ class NudgeService:
                     await session.rollback()
                     log.exception("n6 send failed: transport=%s peer_id=%s", transport, peer_id)
 
-    async def _check_nudge7(self) -> None:
+    async def _check_nudge7(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         today_ist = _today_istanbul()
 
@@ -365,6 +410,9 @@ class NudgeService:
                 .order_by(Request.id.asc())
                 .limit(50)
             )
+            if transport_filter:
+                stmt = stmt.where(Request.transport == transport_filter)
+
             rows = (await session.execute(stmt)).all()
             if not rows:
                 return

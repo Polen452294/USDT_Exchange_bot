@@ -59,6 +59,22 @@ class RequestService:
         self._drafts = draft_repo
         self._requests = request_repo
 
+    def _reset_nudges_for_request(self, req: Request) -> None:
+        req.nudge1_sent_at = None
+        req.nudge1_answer = None
+
+        req.nudge5_sent_at = None
+        req.nudge5_answer = None
+        req.nudge5_answered_at = None
+
+        req.nudge6_sent_at = None
+        req.nudge6_answer = None
+        req.nudge6_answered_at = None
+
+        req.nudge7_sent_at = None
+        req.nudge7_answer = None
+        req.nudge7_answered_at = None
+
     async def ensure_client_request_id(self, draft: Draft) -> str:
         if draft.client_request_id:
             return draft.client_request_id
@@ -163,6 +179,62 @@ class RequestService:
 
         existing = await self._requests.get_by_client_request_id(client_request_id)
         if existing is not None:
+            if not rate or not receive_amount or not summary_text:
+                summary = await self.build_summary_ctx(transport, peer_id)
+                rate = summary.rate
+                receive_amount = summary.receive_amount
+                summary_text = summary.summary_text
+
+            existing.transport = transport
+            existing.peer_id = peer_id
+            existing.telegram_user_id = (peer_id if transport == "tg" else None)
+
+            existing.direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))
+            existing.give_amount = float(draft.give_amount)
+            existing.office_id = str(draft.office_id)
+            existing.desired_date = draft.desired_date
+            existing.rate = float(rate)
+            existing.receive_amount = float(receive_amount)
+            existing.username = str(draft.username)
+            existing.summary_text = str(summary_text)
+
+            self._reset_nudges_for_request(existing)
+
+            existing.nudge1_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge1_delay_seconds)
+
+            today = datetime.utcnow().date()
+
+            if settings.nudge5_test_mode:
+                existing.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
+            else:
+                existing.nudge5_planned_at = None
+                if existing.desired_date and existing.desired_date != today:
+                    if existing.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
+                        planned_day_5 = existing.desired_date - timedelta(days=settings.nudge5_lead_days)
+                        existing.nudge5_planned_at = _istanbul_10_to_utc_naive(planned_day_5)
+
+            if settings.nudge6_test_mode:
+                existing.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
+            else:
+                existing.nudge6_planned_at = None
+                if existing.desired_date and existing.desired_date != today:
+                    if existing.desired_date >= (today + timedelta(days=settings.nudge6_lead_days)):
+                        planned_day_6 = existing.desired_date - timedelta(days=settings.nudge6_lead_days)
+                        existing.nudge6_planned_at = _istanbul_10_to_utc_naive(planned_day_6)
+
+            if settings.nudge7_test_mode:
+                existing.nudge7_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge7_test_delay_seconds)
+            else:
+                existing.nudge7_planned_at = None
+                if existing.desired_date:
+                    existing.nudge7_planned_at = _istanbul_10_to_utc_naive(existing.desired_date)
+
+            await self._requests.save()
+
+            draft.last_step = "done"
+            draft.updated_at = datetime.utcnow()
+            await self._drafts.save()
+
             return ConfirmResult(created=False, already_exists=True, crm_request_id=existing.crm_request_id)
 
         if not rate or not receive_amount or not summary_text:

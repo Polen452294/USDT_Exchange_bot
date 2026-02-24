@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional
-
+from app.config import settings
 from app.models import Direction, Draft
 from app.repositories.drafts import DraftRepository
 
@@ -60,9 +60,21 @@ class DraftService:
             peer_id=peer_id,
             telegram_user_id=telegram_user_id,
         )
+
         draft.give_amount = float(amount)
-        draft.last_step = "office_wait"
+        draft.last_step = "amount_wait"
         draft.updated_at = datetime.utcnow()
+
+        # Планирование nudge2 (брошенная заявка)
+        if settings.nudge2_test_mode:
+            delay = timedelta(seconds=settings.nudge2_test_delay_seconds)
+        else:
+            delay = timedelta(minutes=settings.nudge2_delay_minutes)
+
+        draft.nudge2_planned_at = datetime.utcnow() + delay
+        draft.nudge2_sent_at = None
+        draft.nudge2_answer = None
+
         await self._repo.save()
 
     async def set_office(self, transport: str, peer_id: int, office_id: str) -> None:
@@ -70,6 +82,9 @@ class DraftService:
         draft.office_id = office_id
         draft.last_step = "date_wait"
         draft.updated_at = datetime.utcnow()
+        draft.nudge2_planned_at = None
+        draft.nudge2_sent_at = None
+        draft.nudge2_answer = "continued"
         await self._repo.save()
 
     async def set_date(self, transport: str, peer_id: int, desired_date: date) -> None:
