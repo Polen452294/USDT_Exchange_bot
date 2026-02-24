@@ -1,7 +1,10 @@
+# app/services/drafts.py
+
 from __future__ import annotations
 
 from datetime import datetime, date, timedelta
 from typing import Optional
+
 from app.config import settings
 from app.models import Direction, Draft
 from app.repositories.drafts import DraftRepository
@@ -29,11 +32,18 @@ class DraftService:
         draft.updated_at = datetime.utcnow()
         await self._repo.save()
 
-    async def reset_for_new_request(self, transport: str, peer_id: int) -> None:
-        draft = await self.get(transport, peer_id)
-        if draft is None:
-            draft = Draft(transport=transport, peer_id=peer_id, telegram_user_id=peer_id if transport == "tg" else None)
-            self._session.add(draft)
+    async def reset_for_new_request(
+        self,
+        transport: str,
+        peer_id: int,
+        *,
+        telegram_user_id: int | None = None,
+    ) -> None:
+        draft = await self._repo.get_or_create(
+            transport=transport,
+            peer_id=peer_id,
+            telegram_user_id=telegram_user_id,
+        )
 
         draft.direction = None
         draft.give_amount = None
@@ -42,7 +52,6 @@ class DraftService:
         draft.username = None
         draft.client_request_id = None
 
-        # Дожимы draft-уровня (как в TG /start)
         draft.nudge2_planned_at = None
         draft.nudge2_sent_at = None
         draft.nudge2_answer = None
@@ -60,7 +69,7 @@ class DraftService:
         draft.last_step = "start"
         draft.updated_at = datetime.utcnow()
 
-        await self._drafts.save()
+        await self._repo.save()
 
     async def set_direction(
         self,
@@ -98,7 +107,6 @@ class DraftService:
         draft.last_step = "amount_wait"
         draft.updated_at = datetime.utcnow()
 
-        # Планирование nudge2 (брошенная заявка)
         if settings.nudge2_test_mode:
             delay = timedelta(seconds=settings.nudge2_test_delay_seconds)
         else:
@@ -115,9 +123,11 @@ class DraftService:
         draft.office_id = office_id
         draft.last_step = "date_wait"
         draft.updated_at = datetime.utcnow()
+
         draft.nudge2_planned_at = None
         draft.nudge2_sent_at = None
         draft.nudge2_answer = "continued"
+
         await self._repo.save()
 
     async def set_date(self, transport: str, peer_id: int, desired_date: date) -> None:

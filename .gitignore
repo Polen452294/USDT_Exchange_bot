@@ -1,79 +1,46 @@
-# =========================
-# Python
-# =========================
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.venv/
-venv/
-.venv_vk/
-env/
-ENV/
-
-# Pip
-pip-log.txt
-pip-delete-this-directory.txt
-
-# =========================
-# Environment variables
-# =========================
+# env
 .env
 .env.*
 !.env.example
 
-# =========================
-# IDE / Editor
-# =========================
-.vscode/
-.idea/
-*.swp
-*.swo
+# python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
 
-# =========================
-# OS files
-# =========================
-.DS_Store
-Thumbs.db
-desktop.ini
+# venv
+.venv/
+.venv*/
+venv/
+env/
 
-# =========================
-# Logs
-# =========================
+# logs
 *.log
 logs/
+
+# caches / sessions
+*.session
+*.session-journal
+
+# DB / local artifacts
+*.sqlite
+*.db
 *.sqlite3
 
-# =========================
-# Testing / coverage
-# =========================
-.coverage
-.coverage.*
-htmlcov/
+# test caches
 .pytest_cache/
-.cache/
+.mypy_cache/
+.ruff_cache/
 
-# =========================
-# Migrations (если будешь использовать Alembic — убери эту строку)
-# =========================
-migrations/__pycache__/
+# OS
+.DS_Store
+Thumbs.db
 
-# =========================
-# Docker
-# =========================
-*.tar
-*.pid
-
-# =========================
-# Build / dist
-# =========================
-build/
-dist/
-*.egg-info/
-
-# =========================
-# Misc
-# =========================
-*.tmp
-*.bak
+# reports / downloads (если есть)
+downloads/
+reports/

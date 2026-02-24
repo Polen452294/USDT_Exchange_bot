@@ -45,7 +45,7 @@ async def on_nudge6_answer(call: CallbackQuery):
         req.nudge6_answered_at = now
         await session.commit()
         try:
-            await send_request_nudge_event(req, "nudge5", action)
+            await send_request_nudge_event(req, "nudge6", action)
         except Exception:
             log.exception("CRM event failed: nudge5")
 

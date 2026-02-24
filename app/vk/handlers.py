@@ -360,22 +360,12 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
 
     if t_raw == "Да, все отлично":
         draft = await draft_service.get("vk", peer_id)
-
-        # Разрешаем подтверждение только если пользователь реально на шаге 6 (сводка)
         if not draft or draft.last_step != "summary":
-            return {
-                "text": "Заявка уже обработана. Чтобы создать новую — нажмите «Создать заявку».",
-                "keyboard": hide_keyboard(),
-            }
+            return {"text": "Заявка уже обработана. Нажмите «Создать заявку».", "keyboard": hide_keyboard()}
 
-        res = await request_service.confirm_request_ctx("vk", peer_id)
+        await request_service.confirm_request_ctx("vk", peer_id)
+        return {"text": "Готово ✅ Заявка создана. Менеджер свяжется с вами в Telegram.", "keyboard": hide_keyboard()}
 
-        # По ТЗ — фиксированный финальный текст (без эмодзи)
-        final_text = (
-            "Готово Заявка создана. Менеджер свяжется с вами в Telegram, "
-            "как только возьмёт её в работу."
-        )
-    
     if t_raw == "Нет, хочу внести изменения":
         draft = await draft_service.get("vk", peer_id)
 
@@ -391,5 +381,4 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             "keyboard": direction_keyboard(),
         }
     
-    # После завершения шага 6 убираем клавиатуру
-    return {"text": final_text, "keyboard": hide_keyboard()}
+    return {"text": "Ок.", "keyboard": hide_keyboard()}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, select
 
 from app.models import Draft
 
@@ -14,6 +15,20 @@ class DraftRepository:
         return await self._session.scalar(
             select(Draft).where(Draft.transport == transport, Draft.peer_id == peer_id)
         )
+
+    async def get_by_user_id(self, user_id: int) -> Draft | None:
+        q = (
+            select(Draft)
+            .where(
+                Draft.transport == "tg",
+                or_(
+                    Draft.telegram_user_id == int(user_id),
+                    Draft.peer_id == int(user_id),
+                ),
+            )
+            .limit(1)
+        )
+        return (await self._session.execute(q)).scalar_one_or_none()
 
     async def get_or_create(
         self,

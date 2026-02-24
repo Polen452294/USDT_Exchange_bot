@@ -51,7 +51,7 @@ def nudge1_keyboard() -> str:
     kb.add_button("Да, актуально", color=VkKeyboardColor.POSITIVE)
     kb.add_button("Нет, не актуально", color=VkKeyboardColor.NEGATIVE)
     kb.add_line()
-    kb.add_button("Написать менеджеру самому: @coinpointlara", color=VkKeyboardColor.PRIMARY)
+    kb.add_button("Написать менеджеру", color=VkKeyboardColor.PRIMARY)
     return kb.get_keyboard()
 
 def nudge2_keyboard() -> str:

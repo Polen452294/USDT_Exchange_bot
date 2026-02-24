@@ -12,25 +12,25 @@ class Settings(BaseSettings):
     nudge_worker_interval_seconds: int = 5
 
     # базовые задержки (если какой-то дожим не имеет отдельного test_mode)
-    nudge1_delay_seconds: int = 15
+    nudge1_delay_seconds: int = 900  # 15 минут
     nudge2_delay_minutes: int = 20
-    nudge3_delay_seconds: int = 45
-    nudge4_delay_seconds: int = 90
+    nudge3_delay_seconds: int = 7200  # 2 часа
+    nudge4_delay_seconds: int = 86400  # 24 часа
 
     # N2
-    nudge2_test_mode: bool = True
+    nudge2_test_mode: bool = False
     nudge2_test_delay_seconds: int = 25
 
     # N5
-    nudge5_test_mode: bool = True
+    nudge5_test_mode: bool = False
     nudge5_test_delay_seconds: int = 60
 
     # N6
-    nudge6_test_mode: bool = True
+    nudge6_test_mode: bool = False
     nudge6_test_delay_seconds: int = 90
 
     # N7
-    nudge7_test_mode: bool = True
+    nudge7_test_mode: bool = False
     nudge7_test_delay_seconds: int = 120
 
     DB_HOST: str = "localhost"

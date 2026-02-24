@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 
 from aiogram import Router, F
@@ -16,6 +17,7 @@ from app.services.requests import RequestService
 from app.infrastructure.crm_client import CRMTemporaryError, CRMPermanentError
 
 router = Router()
+log = logging.getLogger("summary")
 
 
 async def send_summary(message: Message, state: FSMContext, session: AsyncSession, *, user_id: int) -> None:
@@ -38,53 +40,63 @@ async def send_summary(message: Message, state: FSMContext, session: AsyncSessio
         )
         return
     except Exception:
+        log.exception("send_summary failed: user_id=%s", user_id)
         await message.answer("Не удалось сформировать сводку. Попробуйте снова.")
         return
 
     await message.answer(summary.summary_text, reply_markup=kb_confirm())
     await state.set_state(ExchangeFlow.confirming)
 
-    draft = await draft_repo.get_by_user_id(user_id)
-    if draft:
-        now = datetime.utcnow()
-        draft.step6_at = now
+    try:
+        draft = await draft_repo.get_by_user_id(user_id)
+        if draft:
+            now = datetime.utcnow()
+            draft.step6_at = now
 
-        if draft.nudge3_sent_at is None and draft.nudge3_answer is None:
-            delay = int(getattr(settings, "nudge3_delay_seconds", 6000))
-            draft.nudge3_planned_at = now + timedelta(seconds=delay)
+            if draft.nudge3_sent_at is None and draft.nudge3_answer is None:
+                delay = int(getattr(settings, "nudge3_delay_seconds", 6000))
+                draft.nudge3_planned_at = now + timedelta(seconds=delay)
 
-        await draft_repo.save()
+            await draft_repo.save()
+    except Exception:
+        log.exception("send_summary post-save failed: user_id=%s", user_id)
 
 
 @router.callback_query(F.data == "confirm:no")
 async def confirm_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     await cb.answer()
 
-    draft_repo = DraftRepository(session)
-    draft = await draft_repo.get_by_user_id(cb.from_user.id)
+    try:
+        draft_repo = DraftRepository(session)
+        draft = await draft_repo.get_by_user_id(cb.from_user.id)
 
-    if draft:
-        draft.direction = None
-        draft.give_amount = None
-        draft.office_id = None
-        draft.desired_date = None
-        draft.username = None
-        draft.client_request_id = None
-        draft.last_step = "start"
+        if draft:
+            draft.direction = None
+            draft.give_amount = None
+            draft.office_id = None
+            draft.desired_date = None
+            draft.username = None
+            draft.client_request_id = None
+            draft.last_step = "start"
 
-        draft.step6_at = None
-        draft.nudge3_planned_at = None
-        draft.nudge3_sent_at = None
-        draft.nudge3_answer = None
+            draft.step6_at = None
+            draft.nudge3_planned_at = None
+            draft.nudge3_sent_at = None
+            draft.nudge3_answer = None
 
-        await draft_repo.save()
+            await draft_repo.save()
 
-    await state.clear()
-    await cb.message.answer(
-        "Хорошо, давайте поправим. Выберите направление перевода",
-        reply_markup=kb_start(),
-    )
-    await state.set_state(ExchangeFlow.choosing_direction)
+        await state.clear()
+        await cb.message.answer(
+            "Хорошо, давайте поправим. Выберите направление перевода",
+            reply_markup=kb_start(),
+        )
+        await state.set_state(ExchangeFlow.choosing_direction)
+
+    except Exception:
+        log.exception("confirm_no failed: user_id=%s", cb.from_user.id)
+        await cb.message.answer("Произошла ошибка. Попробуйте снова.")
+        await state.clear()
 
 
 @router.callback_query(F.data == "confirm:yes")
@@ -97,19 +109,30 @@ async def confirm_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
 
     try:
         result = await service.confirm_request(cb.from_user.id)
+
     except CRMTemporaryError:
         await cb.message.answer(
             "Заявку в CRM сейчас создать не удалось (временная ошибка). "
             "Пожалуйста, нажмите «Да» ещё раз через минуту."
         )
         return
+
     except CRMPermanentError:
         await cb.message.answer(
             "Заявку в CRM сейчас создать не удалось. "
             "Пожалуйста, напишите менеджеру @coinpointlara — он поможет вручную."
         )
         return
+
+    except ValueError as e:
+        # это полезно видеть отдельно (часто draft_not_ready / draft_not_found)
+        log.warning("confirm_yes rejected: user_id=%s err=%s", cb.from_user.id, str(e))
+        await cb.message.answer("Не получилось подтвердить заявку. Попробуйте пройти шаги заново через /start.")
+        await state.clear()
+        return
+
     except Exception:
+        log.exception("confirm_yes failed: user_id=%s", cb.from_user.id)
         await cb.message.answer("Произошла ошибка. Попробуйте снова.")
         return
 
