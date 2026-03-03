@@ -2,7 +2,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+    env_file=".env",
+    env_file_encoding="utf-8",
+    extra="ignore",
+    )
 
     BOT_TOKEN: str
 
@@ -60,6 +64,8 @@ class Settings(BaseSettings):
     VK_GROUP_ID: int | None = None
 
     ADMIN_IDS: str = ""
+
+    rate_calc_mode: str = "multiply"
 
     @property
     def admin_ids(self) -> set[int]:

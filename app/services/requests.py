@@ -114,7 +114,9 @@ class RequestService:
             log.exception("Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction)
             raise CRMTemporaryError("unexpected_crm_error")
 
-        if direction == Direction.CASH_TO_USDT and settings.rate_calc_mode == "divide_cash_to_usdt":
+        direction_str = draft.direction.value if isinstance(draft.direction, Direction) else str(draft.direction)
+
+        if direction_str == "CASH_TO_USDT" and settings.rate_calc_mode == "divide_cash_to_usdt":
             receive_amount = draft.give_amount / rate if rate else 0
         else:
             receive_amount = draft.give_amount * rate

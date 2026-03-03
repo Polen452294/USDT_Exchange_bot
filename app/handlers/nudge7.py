@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+from zoneinfo import ZoneInfo
 
 from aiogram import Router, F
 from aiogram.types import CallbackQuery

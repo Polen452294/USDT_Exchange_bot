@@ -538,6 +538,10 @@ class NudgeService:
         now = datetime.utcnow()
         today_ist = _today_istanbul()
 
+        ist = ZoneInfo("Europe/Istanbul")
+        now_ist = datetime.now(tz=ist)
+        ten_ist_today = now_ist.replace(hour=10, minute=0, second=0, microsecond=0)
+
         async with AsyncSessionLocal() as session:
             stmt = (
                 select(Request.id)
@@ -574,6 +578,10 @@ class NudgeService:
                         req.nudge7_sent_at = now
                         req.nudge7_answer = "skip_not_today"
                         await session.commit()
+                        continue
+
+                    # Отправляем строго после 10:00 по Турции
+                    if now_ist < ten_ist_today:
                         continue
 
                     if req.crm_request_id:
