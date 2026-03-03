@@ -542,6 +542,10 @@ class NudgeService:
         now_ist = datetime.now(tz=ist)
         ten_ist_today = now_ist.replace(hour=10, minute=0, second=0, microsecond=0)
 
+        grace_seconds = 15 * 60  # 15 минут
+        grace_until = ten_ist_today + timedelta(seconds=grace_seconds)
+
+
         async with AsyncSessionLocal() as session:
             stmt = (
                 select(Request.id)
@@ -579,6 +583,16 @@ class NudgeService:
                         req.nudge7_answer = "skip_not_today"
                         await session.commit()
                         continue
+
+                    if req.desired_date == today_ist:
+                        if now_ist < ten_ist_today:
+                            continue
+
+                        if now_ist > grace_until:
+                            req.nudge7_sent_at = now
+                            req.nudge7_answer = "skip_missed_10am"
+                            await session.commit()
+                            continue
 
                     # Отправляем строго после 10:00 по Турции
                     if now_ist < ten_ist_today:

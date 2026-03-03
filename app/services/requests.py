@@ -87,10 +87,7 @@ class RequestService:
         return await self.build_summary_ctx("tg", telegram_user_id)
 
     async def build_summary_ctx(self, transport: str, peer_id: int) -> SummaryResult:
-        if transport == "tg":
-            draft = await self._drafts.get_by_user_id(int(peer_id))
-        else:
-            draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
+        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
@@ -114,9 +111,7 @@ class RequestService:
             log.exception("Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction)
             raise CRMTemporaryError("unexpected_crm_error")
 
-        direction_str = draft.direction.value if isinstance(draft.direction, Direction) else str(draft.direction)
-
-        if direction_str == "CASH_TO_USDT" and settings.rate_calc_mode == "divide_cash_to_usdt":
+        if direction == Direction.CASH_TO_USDT and settings.rate_calc_mode == "divide_cash_to_usdt":
             receive_amount = draft.give_amount / rate if rate else 0
         else:
             receive_amount = draft.give_amount * rate
@@ -176,10 +171,7 @@ class RequestService:
         receive_amount: float | None = None,
         summary_text: str | None = None,
     ) -> ConfirmResult:
-        if transport == "tg":
-            draft = await self._drafts.get_by_user_id(int(peer_id))
-        else:
-            draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
+        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
