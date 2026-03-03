@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # базовые задержки (если какой-то дожим не имеет отдельного test_mode)
     nudge1_delay_seconds: int = 900  # 15 минут
-    nudge2_delay_minutes: int = 20
+    nudge2_delay_seconds: int = 1200  # 20 минут
     nudge3_delay_seconds: int = 7200  # 2 часа
     nudge4_delay_seconds: int = 86400  # 24 часа
 

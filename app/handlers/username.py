@@ -1,10 +1,9 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Draft
+from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 from app.utils import normalize_username
 
@@ -20,10 +19,12 @@ async def enter_username(message: Message, state: FSMContext, session: AsyncSess
         return
 
     tg_id = message.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
+
     draft.username = username
     draft.last_step = "username_manual"
-    await session.commit()
+    await drafts.save()
 
     await message.answer("Спасибо! Готовлю сводку…")
     await state.set_state(ExchangeFlow.confirming)

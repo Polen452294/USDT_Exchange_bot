@@ -1,18 +1,18 @@
 from __future__ import annotations
+
 from datetime import datetime
+
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import timedelta
 
-from app.config import settings
 from app.models import Draft
 from app.states import ExchangeFlow
 from app.utils import parse_amount
 from app.keyboards import kb_offices
 from app.infrastructure.crm_client import get_crm_client, CRMTemporaryError, CRMPermanentError
+from app.repositories.drafts import DraftRepository
 
 router = Router()
 
@@ -29,16 +29,13 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
         return
 
     tg_id = message.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     draft.give_amount = float(amount)
     draft.last_step = "amount"
     draft.updated_at = datetime.utcnow()
-
-    await session.commit()
+    await drafts.save()
 
     crm = get_crm_client()
     try:
@@ -49,14 +46,11 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
         )
         return
     except Exception:
-        await message.answer(
-            "Произошла ошибка при получении офисов. Попробуйте чуть позже."
-        )
+        await message.answer("Произошла ошибка при получении офисов. Попробуйте чуть позже.")
         return
 
     await message.answer(
         "Выберите, пожалуйста, где вам удобнее провести обмен",
         reply_markup=kb_offices(offices),
     )
-
     await state.set_state(ExchangeFlow.choosing_office)

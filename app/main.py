@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from sqlalchemy import text
 import logging
+
+from aiogram.enums import BotCommandScopeType
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.methods import SetMyCommands
+from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat
 
 from app.bootstrap import build_bot, build_dispatcher, setup_logging
 from app.config import settings
-from app.db import engine
-from app.models import Base
 from app.handlers import start, amount, office, date, username, summary, nudge2, nudge3
-from aiogram.types import BotCommand
-from aiogram.enums import BotCommandScopeType
-from aiogram.methods import SetMyCommands
-from aiogram.types import BotCommandScopeAllPrivateChats, BotCommandScopeChat
-from aiogram.exceptions import TelegramBadRequest
+from app.startup import on_startup
 
 log = logging.getLogger("bot")
+
 
 def _parse_admin_ids(value) -> list[int]:
     if value is None:
@@ -74,134 +73,6 @@ async def setup_bot_commands(bot) -> None:
         except TelegramBadRequest as e:
             log.warning("skip SetMyCommands for admin_id=%s: %s", admin_id, e.message)
 
-async def on_startup() -> None:
-    async with engine.begin() as conn:
-        if settings.DB_AUTO_CREATE:
-            await conn.run_sync(Base.metadata.create_all)
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge2_planned_at TIMESTAMP NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge1_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge1_sent_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge1_answer VARCHAR(32) NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS step6_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge3_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge2_answered_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge4_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge5_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge5_sent_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge5_answer VARCHAR(32) NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge5_answered_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge6_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge6_sent_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge6_answer VARCHAR(32) NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge6_answered_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge7_planned_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge7_sent_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge7_answer VARCHAR(32) NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE requests
-            ADD COLUMN IF NOT EXISTS nudge7_answered_at TIMESTAMP NULL
-        """))
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge2_sent_at TIMESTAMP NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge2_answer VARCHAR(32) NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge3_sent_at TIMESTAMP NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge3_answer VARCHAR(32) NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge3_answered_at TIMESTAMP NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge4_sent_at TIMESTAMP NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge4_answer VARCHAR(32) NULL
-        """))
-
-        await conn.execute(text("""
-            ALTER TABLE drafts
-            ADD COLUMN IF NOT EXISTS nudge4_answered_at TIMESTAMP NULL
-        """))
-
-
 
 async def main() -> None:
     setup_logging()
@@ -211,7 +82,6 @@ async def main() -> None:
     await setup_bot_commands(bot)
 
     dp = build_dispatcher()
-    
     await dp.start_polling(bot)
 
 

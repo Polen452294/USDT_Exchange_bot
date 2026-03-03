@@ -3,11 +3,10 @@ from datetime import date
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, User
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.keyboards import kb_next
-from app.models import Draft
+from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 from app.utils import parse_date_ddmmyyyy
 
@@ -32,14 +31,12 @@ async def enter_date_manual(message: Message, state: FSMContext, session: AsyncS
         return
 
     tg_id = message.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     draft.desired_date = d
     draft.last_step = "date"
-    await session.commit()
+    await drafts.save()
 
     await go_username_step(message=message, user=message.from_user, state=state, session=session)
 
@@ -49,31 +46,26 @@ async def enter_date_default(cb: CallbackQuery, state: FSMContext, session: Asyn
     await cb.answer()
 
     tg_id = cb.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     draft.desired_date = date.today()
     draft.last_step = "date_default"
-    await session.commit()
+    await drafts.save()
 
     await go_username_step(message=cb.message, user=cb.from_user, state=state, session=session)
 
 
 async def go_username_step(message: Message, user: User, state: FSMContext, session: AsyncSession):
     tg_id = user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
-        await session.commit()
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     username = (user.username or "").strip()
     if username:
         draft.username = username
         draft.last_step = "username_auto"
-        await session.commit()
+        await drafts.save()
 
         await message.answer("Ок, контакт в Telegram найден. Готовлю сводку…")
         await state.set_state(ExchangeFlow.confirming)

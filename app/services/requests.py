@@ -87,7 +87,10 @@ class RequestService:
         return await self.build_summary_ctx("tg", telegram_user_id)
 
     async def build_summary_ctx(self, transport: str, peer_id: int) -> SummaryResult:
-        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
+        if transport == "tg":
+            draft = await self._drafts.get_by_user_id(int(peer_id))
+        else:
+            draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
@@ -171,7 +174,10 @@ class RequestService:
         receive_amount: float | None = None,
         summary_text: str | None = None,
     ) -> ConfirmResult:
-        draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
+        if transport == "tg":
+            draft = await self._drafts.get_by_user_id(int(peer_id))
+        else:
+            draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 

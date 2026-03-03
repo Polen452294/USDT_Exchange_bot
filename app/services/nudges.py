@@ -258,7 +258,7 @@ class NudgeService:
             stmt = (
                 select(Draft.id)
                 .where(Draft.last_step.in_(STEPS_FOR_NUDGE2))
-                .where(Draft.give_amount.is_not(None))
+                #.where(Draft.give_amount.is_not(None))
                 .where(Draft.nudge2_answer.is_(None))
                 .where(Draft.nudge2_sent_at.is_(None))
                 .where(Draft.nudge2_planned_at.is_not(None))

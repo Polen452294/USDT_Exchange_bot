@@ -110,7 +110,7 @@ class DraftService:
         if settings.nudge2_test_mode:
             delay = timedelta(seconds=settings.nudge2_test_delay_seconds)
         else:
-            delay = timedelta(minutes=settings.nudge2_delay_minutes)
+            delay = timedelta(seconds=settings.nudge2_delay_seconds)
 
         draft.nudge2_planned_at = datetime.utcnow() + delay
         draft.nudge2_sent_at = None

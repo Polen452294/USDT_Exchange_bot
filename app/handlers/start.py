@@ -2,13 +2,13 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 
 from app.config import settings
-from app.models import Direction, Draft
+from app.models import Direction
 from app.keyboards import kb_start
+from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 
 router = Router()
@@ -32,36 +32,33 @@ async def start_cmd(message: Message, state: FSMContext, session: AsyncSession):
     await state.clear()
 
     tg_id = message.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
-    else:
-        draft.direction = None
-        draft.give_amount = None
-        draft.office_id = None
-        draft.desired_date = None
-        draft.username = None
-        draft.client_request_id = None
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
-        draft.nudge2_planned_at = None
-        draft.nudge2_sent_at = None
-        draft.nudge2_answer = None
+    draft.direction = None
+    draft.give_amount = None
+    draft.office_id = None
+    draft.desired_date = None
+    draft.username = None
+    draft.client_request_id = None
 
-        draft.step6_at = None
-        draft.nudge3_planned_at = None
-        draft.nudge3_sent_at = None
-        draft.nudge3_answer = None
+    draft.nudge2_planned_at = None
+    draft.nudge2_sent_at = None
+    draft.nudge2_answer = None
+    draft.nudge2_answered_at = None
 
-        draft.nudge2_answered_at = None
-        draft.nudge4_planned_at = None
-        draft.nudge4_sent_at = None
-        draft.nudge4_answer = None
+    draft.step6_at = None
+    draft.nudge3_planned_at = None
+    draft.nudge3_sent_at = None
+    draft.nudge3_answer = None
 
-        draft.last_step = "start"
-        draft.updated_at = datetime.utcnow()
+    draft.nudge4_planned_at = None
+    draft.nudge4_sent_at = None
+    draft.nudge4_answer = None
 
-    await session.commit()
+    draft.last_step = "start"
+    draft.updated_at = datetime.utcnow()
+    await drafts.save()
 
     await message.answer(START_TEXT, reply_markup=kb_start())
     await state.set_state(ExchangeFlow.choosing_direction)
@@ -75,10 +72,8 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     direction = Direction(direction_value)
 
     tg_id = cb.from_user.id
-    draft = await session.scalar(select(Draft).where(Draft.telegram_user_id == tg_id))
-    if draft is None:
-        draft = Draft(transport="tg", peer_id=tg_id, telegram_user_id=tg_id, last_step="start")
-        session.add(draft)
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     draft.direction = direction
     draft.last_step = "amount_wait"
@@ -89,7 +84,7 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     draft.nudge2_sent_at = None
     draft.nudge2_answer = None
 
-    await session.commit()
+    await drafts.save()
 
     await cb.message.answer("Введите, пожалуйста, сумму, которую вы отдаёте.")
     await state.set_state(ExchangeFlow.entering_amount)

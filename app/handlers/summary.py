@@ -27,6 +27,11 @@ async def send_summary(message: Message, state: FSMContext, session: AsyncSessio
 
     try:
         summary = await service.build_summary(user_id)
+    except ValueError as e:
+        log.warning("send_summary rejected: user_id=%s err=%s", user_id, str(e))
+        await message.answer("Не получилось собрать сводку. Начните заново через /start.")
+        await state.clear()
+        return
     except CRMTemporaryError:
         await message.answer(
             "Сейчас не могу получить курс (временная ошибка). "

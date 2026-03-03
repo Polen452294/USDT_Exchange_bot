@@ -1,14 +1,18 @@
-from __future__ import annotations
-
 import asyncio
+import logging
 
 from app.bootstrap import build_bot, setup_logging
 from app.infrastructure.worker import run_nudge_worker
+from app.startup import on_startup
 from app.vk.sender import send_vk_message
+
+log = logging.getLogger("nudges")
 
 
 async def main() -> None:
     setup_logging()
+    await on_startup()
+
     bot = build_bot()
     await run_nudge_worker(bot, vk_sender=send_vk_message)
 
