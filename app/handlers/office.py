@@ -25,7 +25,7 @@ async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSess
     await drafts.save()
 
     await cb.message.answer(
-        "Когда вам удобно получить наличные? По умолчанию стоит сегодняшняя дата — "
+        "Когда вам удобно провести обмен? По умолчанию стоит сегодняшняя дата — "
         "можете оставить её и нажать «Далее». Или нажмите на поле и введите желаемую дату\n"
         "Формат: дд.мм.гггг",
         reply_markup=kb_next(),

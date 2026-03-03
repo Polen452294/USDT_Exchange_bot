@@ -1,12 +1,14 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.models import Direction, direction_button_label
+
 
 def kb_start() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="USDT в наличные", callback_data="dir:USDT_TO_CASH")],
-            [InlineKeyboardButton(text="Наличные в USDT", callback_data="dir:CASH_TO_USDT")],
+            [InlineKeyboardButton(text=direction_button_label(Direction.USDT_TO_TRY_CASH), callback_data="dir:USDT_TO_TRY_CASH")],
+            [InlineKeyboardButton(text=direction_button_label(Direction.TRY_CASH_TO_USDT), callback_data="dir:TRY_CASH_TO_USDT")],
         ]
     )
 
@@ -48,6 +50,7 @@ def kb_nudge1() -> InlineKeyboardMarkup:
     kb.adjust(1)
     return kb.as_markup()
 
+
 def kb_nudge3():
     kb = InlineKeyboardBuilder()
     kb.button(text="Да, зафиксировать", callback_data="n3:yes")
@@ -55,11 +58,13 @@ def kb_nudge3():
     kb.adjust(1)
     return kb.as_markup()
 
+
 def kb_nudge4() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="Да", callback_data="n4:yes")
     kb.adjust(1)
     return kb.as_markup()
+
 
 def kb_nudge5(request_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(

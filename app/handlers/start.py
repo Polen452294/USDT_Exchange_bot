@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 
 from app.config import settings
-from app.models import Direction
+from app.models import Direction, direction_from_currency
 from app.keyboards import kb_start
 from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
@@ -15,7 +15,7 @@ router = Router()
 
 START_TEXT = (
     "Привет!\n"
-    "Я помогу быстро оформить заявку на обмен USDT ↔ наличные в Турции за несколько шагов:\n"
+    "Я помогу быстро оформить заявку на обмен за несколько шагов:\n"
     "➔ выберите направление обмена\n"
     "➔ укажите сумму, которую отдаете\n"
     "➔ выберите офис в Анталье или Стамбуле\n"
@@ -86,5 +86,6 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
 
     await drafts.save()
 
-    await cb.message.answer("Введите, пожалуйста, сумму, которую вы отдаёте.")
+    give_cur = direction_from_currency(direction) or "сумму"
+    await cb.message.answer(f"Введите, пожалуйста, сумму, которую вы отдаёте ({give_cur}).")
     await state.set_state(ExchangeFlow.entering_amount)

@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from app.models import Draft, Request, Direction
+from app.models import Draft, Request, Direction, direction_from_currency, direction_to_currency
 from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
 from app.infrastructure.crm_client import get_crm_client, CRMTemporaryError, CRMPermanentError
@@ -94,40 +94,38 @@ class RequestService:
         if not draft.direction or not draft.give_amount or not draft.office_id or not draft.desired_date:
             raise ValueError("draft_not_ready")
 
-        direction = draft.direction.value if isinstance(draft.direction, Direction) else str(draft.direction)
-        if direction not in ("USDT_TO_CASH", "CASH_TO_USDT"):
+        direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))
+
+        # принимаем только новые направления (старые оставлены для совместимости БД)
+        if direction not in (Direction.USDT_TO_TRY_CASH, Direction.TRY_CASH_TO_USDT):
             raise ValueError("bad_direction")
 
         await self.ensure_client_request_id(draft)
 
         crm = get_crm_client()
         try:
-            rate = await crm.get_rate(str(draft.office_id), direction)  # type: ignore[arg-type]
+            rate = await crm.get_rate(str(draft.office_id), direction.value)  # CRM ожидает строку
             office_label = await crm.get_office_label(str(draft.office_id))
         except (CRMTemporaryError, CRMPermanentError):
-            log.exception("CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction)
+            log.exception("CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction.value)
             raise
         except Exception:
-            log.exception("Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction)
+            log.exception("Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction.value)
             raise CRMTemporaryError("unexpected_crm_error")
 
-        if direction == Direction.CASH_TO_USDT and settings.rate_calc_mode == "divide_cash_to_usdt":
+        if direction == Direction.TRY_CASH_TO_USDT and settings.rate_calc_mode == "divide_cash_to_usdt":
             receive_amount = draft.give_amount / rate if rate else 0
         else:
             receive_amount = draft.give_amount * rate
 
-        if direction == "USDT_TO_CASH":
-            give_currency = "USDT"
-            recv_currency = "наличные"
-        else:
-            give_currency = "наличные"
-            recv_currency = "USDT"
+        give_currency = direction_from_currency(direction) or "—"
+        recv_currency = direction_to_currency(direction) or "—"
 
         summary_text = (
             "Почти готово. Проверьте, пожалуйста, данные заявки – покажу всё одним блоком.\n"
             f"➔ Вы отдаёте: {_money(float(draft.give_amount))} {give_currency}\n"
             f"➔ Офис: {office_label}\n"
-            f"➔ Дата получения: {draft.desired_date.strftime('%d.%m.%Y')}\n"
+            f"➔ Дата сделки: {draft.desired_date.strftime('%d.%m.%Y')}\n"
             f"➔ Текущий курс: {rate}\n"
             f"➔ Вы получаете: {_money(receive_amount)} {recv_currency}\n\n"
             f"{DISCLAIMER}\n\n"
@@ -178,6 +176,10 @@ class RequestService:
         if not draft.direction or not draft.give_amount or not draft.office_id or not draft.desired_date or not draft.username:
             raise ValueError("draft_not_ready")
 
+        direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))
+        if direction not in (Direction.USDT_TO_TRY_CASH, Direction.TRY_CASH_TO_USDT):
+            raise ValueError("bad_direction")
+
         client_request_id = await self.ensure_client_request_id(draft)
 
         existing = await self._requests.get_by_client_request_id(client_request_id)
@@ -192,7 +194,7 @@ class RequestService:
             existing.peer_id = peer_id
             existing.telegram_user_id = (peer_id if transport == "tg" else None)
 
-            existing.direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))
+            existing.direction = direction
             existing.give_amount = float(draft.give_amount)
             existing.office_id = str(draft.office_id)
             existing.desired_date = draft.desired_date
@@ -252,7 +254,7 @@ class RequestService:
             telegram_user_id=(peer_id if transport == "tg" else None),
             client_request_id=client_request_id,
             crm_request_id=None,
-            direction=draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction)),
+            direction=direction,
             give_amount=float(draft.give_amount),
             office_id=str(draft.office_id),
             desired_date=draft.desired_date,

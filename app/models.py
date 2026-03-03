@@ -23,8 +23,51 @@ class Base(DeclarativeBase):
 
 
 class Direction(str, enum.Enum):
+    USDT_TO_TRY_CASH = "USDT_TO_TRY_CASH"
+    TRY_CASH_TO_USDT = "TRY_CASH_TO_USDT"
+
+    # оставляем старые значения, чтобы не падать на существующих строках в БД
+    # (если в базе уже есть старые записи / enum тип не мигрировали)
     USDT_TO_CASH = "USDT_TO_CASH"
     CASH_TO_USDT = "CASH_TO_USDT"
+
+
+DIRECTION_META: dict[Direction, dict[str, str]] = {
+    Direction.USDT_TO_TRY_CASH: {
+        "from_currency": "USDT",
+        "to_currency": "TRY",
+        "button_label": "USDT → наличные TRY",
+    },
+    Direction.TRY_CASH_TO_USDT: {
+        "from_currency": "TRY",
+        "to_currency": "USDT",
+        "button_label": "Наличные TRY → USDT",
+    },
+
+    # legacy
+    Direction.USDT_TO_CASH: {
+        "from_currency": "USDT",
+        "to_currency": "наличные",
+        "button_label": "USDT в наличные",
+    },
+    Direction.CASH_TO_USDT: {
+        "from_currency": "наличные",
+        "to_currency": "USDT",
+        "button_label": "Наличные в USDT",
+    },
+}
+
+
+def direction_from_currency(d: Direction) -> str:
+    return DIRECTION_META.get(d, {}).get("from_currency", "")
+
+
+def direction_to_currency(d: Direction) -> str:
+    return DIRECTION_META.get(d, {}).get("to_currency", "")
+
+
+def direction_button_label(d: Direction) -> str:
+    return DIRECTION_META.get(d, {}).get("button_label", d.value)
 
 
 class Draft(Base):
