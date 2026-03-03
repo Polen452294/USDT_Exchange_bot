@@ -4,6 +4,7 @@ from typing import Optional
 
 import vk_api
 from vk_api.longpoll import VkEventType, VkLongPoll
+from requests.exceptions import ReadTimeout, ConnectionError as RequestsConnectionError
 
 from app.config import settings
 from app.db import AsyncSessionLocal
@@ -54,7 +55,16 @@ async def run_vk_bot() -> None:
     from app.vk.handlers import handle_vk_message
 
     while True:
-        events = await loop.run_in_executor(None, longpoll.check)
+        try:
+            events = await loop.run_in_executor(None, longpoll.check)
+        except (ReadTimeout, RequestsConnectionError, TimeoutError) as e:
+            logger.warning("vk longpoll timeout/connection issue: %r", e)
+            await asyncio.sleep(2)
+            continue
+        except Exception:
+            logger.exception("vk longpoll unexpected error")
+            await asyncio.sleep(2)
+            continue
         for ev in events:
             if ev.type != VkEventType.MESSAGE_NEW:
                 continue
