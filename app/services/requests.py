@@ -82,6 +82,9 @@ class RequestService:
         draft.updated_at = datetime.utcnow()
         await self._drafts.save()
         return draft.client_request_id
+    
+    nudge5_lead_days = int(getattr(settings, "nudge5_lead_days", 1))
+    nudge6_lead_days = int(getattr(settings, "nudge6_lead_days", 2))
 
     async def build_summary(self, telegram_user_id: int) -> SummaryResult:
         return await self.build_summary_ctx("tg", telegram_user_id)
@@ -182,6 +185,9 @@ class RequestService:
 
         client_request_id = await self.ensure_client_request_id(draft)
 
+        nudge5_lead_days = int(getattr(settings, "nudge5_lead_days", 1))
+        nudge6_lead_days = int(getattr(settings, "nudge6_lead_days", 2))
+
         existing = await self._requests.get_by_client_request_id(client_request_id)
         if existing is not None:
             if not rate or not receive_amount or not summary_text:
@@ -214,8 +220,8 @@ class RequestService:
             else:
                 existing.nudge5_planned_at = None
                 if existing.desired_date and existing.desired_date != today:
-                    if existing.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
-                        planned_day_5 = existing.desired_date - timedelta(days=settings.nudge5_lead_days)
+                    if existing.desired_date >= (today + timedelta(days=nudge5_lead_days)):
+                        planned_day_5 = existing.desired_date - timedelta(days=nudge5_lead_days)
                         existing.nudge5_planned_at = _istanbul_10_to_utc_naive(planned_day_5)
 
             if settings.nudge6_test_mode:
@@ -223,8 +229,8 @@ class RequestService:
             else:
                 existing.nudge6_planned_at = None
                 if existing.desired_date and existing.desired_date != today:
-                    if existing.desired_date >= (today + timedelta(days=settings.nudge6_lead_days)):
-                        planned_day_6 = existing.desired_date - timedelta(days=settings.nudge6_lead_days)
+                    if existing.desired_date >= (today + timedelta(days=nudge6_lead_days)):
+                        planned_day_6 = existing.desired_date - timedelta(days=nudge6_lead_days)
                         existing.nudge6_planned_at = _istanbul_10_to_utc_naive(planned_day_6)
 
             if settings.nudge7_test_mode:
@@ -272,16 +278,16 @@ class RequestService:
             req.nudge5_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge5_test_delay_seconds)
         else:
             if req.desired_date and req.desired_date != today:
-                if req.desired_date >= (today + timedelta(days=settings.nudge5_lead_days)):
-                    planned_day_5 = req.desired_date - timedelta(days=settings.nudge5_lead_days)
+                if req.desired_date >= (today + timedelta(days=nudge5_lead_days)):
+                    planned_day_5 = req.desired_date - timedelta(days=nudge5_lead_days)
                     req.nudge5_planned_at = _istanbul_10_to_utc_naive(planned_day_5)
 
         if settings.nudge6_test_mode:
             req.nudge6_planned_at = datetime.utcnow() + timedelta(seconds=settings.nudge6_test_delay_seconds)
         else:
             if req.desired_date and req.desired_date != today:
-                if req.desired_date >= (today + timedelta(days=settings.nudge6_lead_days)):
-                    planned_day_6 = req.desired_date - timedelta(days=settings.nudge6_lead_days)
+                if req.desired_date >= (today + timedelta(days=nudge6_lead_days)):
+                    planned_day_6 = req.desired_date - timedelta(days=nudge6_lead_days)
                     req.nudge6_planned_at = _istanbul_10_to_utc_naive(planned_day_6)
 
         if settings.nudge7_test_mode:

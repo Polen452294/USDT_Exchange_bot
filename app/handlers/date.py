@@ -1,33 +1,69 @@
-from datetime import date
+from __future__ import annotations
+
+from datetime import date, timedelta
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, User
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.keyboards import kb_next
 from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 from app.utils import parse_date_ddmmyyyy
 
 router = Router()
 
+MAX_DAYS_AHEAD = 7
+
+
+def _validate_date_window(d: date) -> None:
+    today = date.today()
+    if d < today:
+        raise ValueError("past")
+    if d > today + timedelta(days=MAX_DAYS_AHEAD - 1):
+        raise ValueError("too_far")
+
+
+@router.callback_query(ExchangeFlow.entering_date, F.data.startswith("date:"))
+async def pick_date(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await cb.answer()
+
+    iso = cb.data.split(":", 1)[1]
+    try:
+        d = date.fromisoformat(iso)
+        _validate_date_window(d)
+    except Exception:
+        today = date.today()
+        max_day = today + timedelta(days=MAX_DAYS_AHEAD - 1)
+        await cb.message.answer(
+            f"Некорректная дата. Можно выбрать от сегодня до {max_day.strftime('%d.%m')}."
+        )
+        return
+
+    tg_id = cb.from_user.id
+    drafts = DraftRepository(session)
+    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
+
+    draft.desired_date = d
+    draft.last_step = "date_pick"
+    await drafts.save()
+
+    await go_username_step(message=cb.message, user=cb.from_user, state=state, session=session)
+
 
 @router.message(ExchangeFlow.entering_date)
 async def enter_date_manual(message: Message, state: FSMContext, session: AsyncSession):
     try:
         d = parse_date_ddmmyyyy(message.text)
+        _validate_date_window(d)
     except Exception:
-        today_example = date.today().strftime("%d.%m.%Y")
+        today = date.today()
+        max_day = today + timedelta(days=MAX_DAYS_AHEAD - 1)
         await message.answer(
             "Некорректная дата.\n"
             "Введите в формате: дд.мм.гггг\n"
-            f"Пример: {today_example}"
+            f"Можно выбрать дату от сегодня до {max_day.strftime('%d.%m')}."
         )
-        return
-
-    if d < date.today():
-        await message.answer("Дата не может быть в прошлом. Введите другую дату.")
         return
 
     tg_id = message.from_user.id
@@ -35,25 +71,10 @@ async def enter_date_manual(message: Message, state: FSMContext, session: AsyncS
     draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
 
     draft.desired_date = d
-    draft.last_step = "date"
+    draft.last_step = "date_manual"
     await drafts.save()
 
     await go_username_step(message=message, user=message.from_user, state=state, session=session)
-
-
-@router.callback_query(ExchangeFlow.entering_date, F.data == "next")
-async def enter_date_default(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
-    await cb.answer()
-
-    tg_id = cb.from_user.id
-    drafts = DraftRepository(session)
-    draft = await drafts.get_or_create(transport="tg", peer_id=tg_id, telegram_user_id=tg_id)
-
-    draft.desired_date = date.today()
-    draft.last_step = "date_default"
-    await drafts.save()
-
-    await go_username_step(message=cb.message, user=cb.from_user, state=state, session=session)
 
 
 async def go_username_step(message: Message, user: User, state: FSMContext, session: AsyncSession):

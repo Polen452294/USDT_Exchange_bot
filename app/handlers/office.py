@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.keyboards import kb_next
+from app.keyboards import kb_dates_7
 from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 
@@ -25,9 +25,8 @@ async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSess
     await drafts.save()
 
     await cb.message.answer(
-        "Когда вам удобно провести обмен? По умолчанию стоит сегодняшняя дата — "
-        "можете оставить её и нажать «Далее». Или нажмите на поле и введите желаемую дату\n"
-        "Формат: дд.мм.гггг",
-        reply_markup=kb_next(),
+        "Когда вам удобно провести обмен?\n"
+        "Выберите дату из ближайших 7 дней:",
+        reply_markup=kb_dates_7(),
     )
     await state.set_state(ExchangeFlow.entering_date)

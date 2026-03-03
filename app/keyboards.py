@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from datetime import date, timedelta
 
 from app.models import Direction, direction_button_label
 
@@ -91,3 +92,22 @@ def kb_nudge7(request_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Нет", callback_data=f"n7_no:{request_id}")],
         ]
     )
+
+_RU_WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+
+def kb_dates_7(start: date | None = None, days: int = 7) -> InlineKeyboardMarkup:
+    start = start or date.today()
+
+    kb = InlineKeyboardBuilder()
+    for i in range(days):
+        d = start + timedelta(days=i)
+        wd = _RU_WEEKDAYS[d.weekday()]
+        if i == 0:
+            text = f"Сегодня · {wd} · {d.strftime('%d.%m')}"
+        else:
+            text = f"{wd} · {d.strftime('%d.%m')}"
+        kb.button(text=text, callback_data=f"date:{d.isoformat()}")
+
+    kb.adjust(1)
+    return kb.as_markup()
