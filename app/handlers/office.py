@@ -12,6 +12,8 @@ from app.utils.messages import edit_or_send
 
 router = Router()
 
+SEP = "━━━━━━━━━━━━━━"
+
 
 @router.callback_query(ExchangeFlow.choosing_office, F.data.startswith("office:"))
 async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
@@ -28,10 +30,8 @@ async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSess
     draft.updated_at = datetime.utcnow()
     await drafts.save()
 
-    await edit_or_send(
-        cb.message,
-        "Когда вам удобно провести обмен?\n"
-        "Выберите дату из ближайших 7 дней:",
-        reply_markup=kb_dates_7(),
+    text = (
+        "📅 Выберите дату сделки (из ближайших 7 дней)\n\n"
     )
+    await edit_or_send(cb.message, text, reply_markup=kb_dates_7())
     await state.set_state(ExchangeFlow.entering_date)

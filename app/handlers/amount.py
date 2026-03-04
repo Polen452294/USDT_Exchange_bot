@@ -15,20 +15,22 @@ from app.repositories.drafts import DraftRepository
 
 router = Router()
 
+SEP = "━━━━━━━━━━━━━━"
+
 OFFICE_ADDRESS_BY_ID: dict[str, str] = {
     "antalya_center": (
-        "1) Анталия Центр\n"
+        "1) 📍 Анталия Центр\n"
         "Kestane İş Merkezi\n"
         "Muratpaşa, 07040 Muratpaşa/Antalya, Турция"
     ),
     "antalya_lara": (
-        "2) Анталия Лара\n"
+        "2) 📍 Анталия Лара\n"
         "Çağlayan, Barınaklar Blv.\n"
         "Köken Apartman No: 27/A, Zemin Kat\n"
         "07010 Muratpaşa/Antalya, Турция"
     ),
     "istanbul": (
-        "3) Стамбул\n"
+        "3) 📍 Стамбул\n"
         "VILAYETHAN BINASINDA BULUNAN -IB NOLU DÜKKANLAR\n"
         "Alemdar, Ankara Cd. No:8\n"
         "34110 Fatih/İstanbul, Турция"
@@ -51,8 +53,10 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
         amount = parse_amount(message.text)
     except Exception:
         await message.answer(
-            "Введите число больше 0.\n"
-            "Можно использовать дробную часть (например: 1500 или 1500.50)."
+            "⚠️ Не получилось распознать сумму.\n\n"
+            f"{SEP}\n"
+            "✍️ Отправьте число больше 0.\n"
+            "Пример: 2000 или 1500.50"
         )
         return
 
@@ -70,11 +74,17 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
         offices = await crm.get_offices()
     except (CRMTemporaryError, CRMPermanentError):
         await message.answer(
-            "Сейчас не могу получить список офисов. Попробуйте чуть позже или напишите менеджеру @coinpointlara."
+            "⚠️ Сейчас не могу получить список офисов.\n\n"
+            f"{SEP}\n"
+            "👤 Попробуйте чуть позже или напишите менеджеру @coinpointlara."
         )
         return
     except Exception:
-        await message.answer("Произошла ошибка при получении офисов. Попробуйте чуть позже.")
+        await message.answer(
+            "⚠️ Произошла ошибка при получении офисов.\n\n"
+            f"{SEP}\n"
+            "🔄 Попробуйте чуть позже."
+        )
         return
 
     addresses = [
@@ -83,10 +93,12 @@ async def enter_amount(message: Message, state: FSMContext, session: AsyncSessio
         OFFICE_ADDRESS_BY_ID["istanbul"],
     ]
 
-    text = "Доступные офисы:\n\n" + "\n\n".join(addresses) + "\n\nВыберите, пожалуйста, где вам удобнее провести обмен"
-
-    await message.answer(
-        text,
-        reply_markup=kb_offices(offices),
+    text = (
+        "🏢 Выберите офис, где вам удобнее провести обмен:\n\n"
+        + "\n\n".join(addresses)
+        + f"\n\n{SEP}\n"
+        "👇 Нажмите кнопку с нужным офисом."
     )
+
+    await message.answer(text, reply_markup=kb_offices(offices))
     await state.set_state(ExchangeFlow.choosing_office)

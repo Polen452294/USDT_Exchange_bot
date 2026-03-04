@@ -14,17 +14,14 @@ from app.states import ExchangeFlow
 
 router = Router()
 
+SEP = "━━━━━━━━━━━━━━"
+
 START_TEXT = (
-    "Привет!\n"
-    "Я помогу быстро оформить заявку на обмен за несколько шагов:\n"
-    "➔ выберите направление обмена\n"
-    "➔ укажите сумму, которую отдаете\n"
-    "➔ выберите офис в Анталье или Стамбуле\n"
-    "➔ выберите желаемую дату сделки\n"
-    "Потом я покажу вам условия обмена и, если вы согласны, попрошу подтвердить их.\n"
-    "После наш менеджер свяжется с вами в Telegram для обсуждения деталей. "
-    "Если нужно быстро задать вопрос — пишите менеджеру напрямую @coinpointlara.\n\n"
-    "Нажмите кнопку ниже, чтобы начать 👇"
+    "👋 Привет! Я помогу оформить заявку на обмен.\n\n"
+    "🧭 Выберите направление обмена ниже.\n\n"
+    f"{SEP}\n"
+    "ℹ️ После подтверждения менеджер свяжется с вами в Telegram.\n"
+    "Если нужно быстро задать вопрос — пишите @coinpointlara."
 )
 
 
@@ -88,10 +85,11 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
 
     await drafts.save()
 
-    give_cur = direction_from_currency(direction) or "сумму"
-    await edit_or_send(
-        cb.message,
-        f"Введите, пожалуйста, сумму, которую вы отдаёте ({give_cur}).",
-        reply_markup=None,
+    give_cur = direction_from_currency(direction) or "—"
+    text = (
+        "💰 Укажите сумму, которую вы отдаёте\n\n"
+        f"✍️ Отправьте число сообщением\n"
+        f"Валюта: {give_cur}"
     )
+    await edit_or_send(cb.message, text, reply_markup=None)
     await state.set_state(ExchangeFlow.entering_amount)

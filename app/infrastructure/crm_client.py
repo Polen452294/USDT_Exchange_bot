@@ -44,9 +44,9 @@ def _join_url(base: str, path: str) -> str:
 class CRMClientMock:
     def __init__(self) -> None:
         self._offices = [
-            {"id": "antalya_1", "button_text": "📍 Анталия Центр", "city": "Antalya"},
-            {"id": "antalya_2", "button_text": "📍 Анталия Лара", "city": "Antalya"},
-            {"id": "istanbul", "button_text": "🏙 Стамбул", "city": "Istanbul"},
+            {"id": "antalya_1", "button_text": "Анталия Центр", "city": "Antalya"},
+            {"id": "antalya_2", "button_text": "Анталия Лара", "city": "Antalya"},
+            {"id": "istanbul", "button_text": "Стамбул", "city": "Istanbul"},
         ]
         self._statuses: dict[str, str] = {}
         self._events: list[dict] = []

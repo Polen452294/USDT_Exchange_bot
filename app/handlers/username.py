@@ -9,13 +9,19 @@ from app.utils import normalize_username
 
 router = Router()
 
+SEP = "━━━━━━━━━━━━━━"
+
 
 @router.message(ExchangeFlow.entering_username)
 async def enter_username(message: Message, state: FSMContext, session: AsyncSession):
     try:
         username = normalize_username(message.text)
     except Exception:
-        await message.answer("Введите корректный username (латиница/цифры/_, без пробелов), можно с @")
+        await message.answer(
+            "⚠️ Некорректный username.\n\n"
+            "✍️ Введите латиницей/цифры/_, без пробелов.\n"
+            "Пример: @yourname"
+        )
         return
 
     tg_id = message.from_user.id
@@ -26,7 +32,11 @@ async def enter_username(message: Message, state: FSMContext, session: AsyncSess
     draft.last_step = "username_manual"
     await drafts.save()
 
-    await message.answer("Спасибо! Готовлю сводку…")
+    await message.answer(
+        "✅ Принято!\n\n"
+        f"{SEP}\n"
+        "🧾 Готовлю сводку заявки…"
+    )
     await state.set_state(ExchangeFlow.confirming)
 
     from app.handlers.summary import send_summary

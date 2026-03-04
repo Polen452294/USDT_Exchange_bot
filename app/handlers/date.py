@@ -15,6 +15,7 @@ from app.utils import parse_date_ddmmyyyy
 router = Router()
 
 MAX_DAYS_AHEAD = 7
+SEP = "━━━━━━━━━━━━━━"
 
 
 def _validate_date_window(d: date) -> None:
@@ -62,8 +63,8 @@ async def enter_date_manual(message: Message, state: FSMContext, session: AsyncS
         today = date.today()
         max_day = today + timedelta(days=MAX_DAYS_AHEAD - 1)
         await message.answer(
-            "Некорректная дата.\n"
-            "Введите в формате: дд.мм.гггг\n"
+            "⚠️ Некорректная дата.\n\n"
+            "✍️ Введите в формате: дд.мм.гггг\n"
             f"Можно выбрать дату от сегодня до {max_day.strftime('%d.%m')}."
         )
         return
@@ -90,7 +91,13 @@ async def go_username_step(message: Message, user: User, state: FSMContext, sess
         draft.last_step = "username_auto"
         await drafts.save()
 
-        await edit_or_send(message, "Ок, контакт в Telegram найден. Готовлю сводку…", reply_markup=None)
+        await edit_or_send(
+            message,
+            "👤 Контакт найден ✅\n\n"
+            f"{SEP}\n"
+            "🧾 Готовлю сводку заявки…",
+            reply_markup=None,
+        )
         await state.set_state(ExchangeFlow.confirming)
 
         from app.handlers.summary import send_summary
@@ -98,7 +105,8 @@ async def go_username_step(message: Message, user: User, state: FSMContext, sess
         return
 
     await message.answer(
-        "Похоже, у вас в Telegram не указан username – а он нужен, чтобы продолжить наше общение. "
-        "Введите, пожалуйста, ваш username"
+        "👤 Укажите ваш Telegram для связи\n\n"
+        "✍️ Отправьте @username (можно без @)\n"
+        "Пример: @yourname"
     )
     await state.set_state(ExchangeFlow.entering_username)

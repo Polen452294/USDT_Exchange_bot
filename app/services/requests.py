@@ -138,16 +138,30 @@ class RequestService:
         give_currency = direction_from_currency(direction) or "—"
         recv_currency = direction_to_currency(direction) or "—"
 
+        sep = "────────────────"
+
+        give_currency = direction_from_currency(direction)
+        recv_currency = direction_to_currency(direction)
+
+        rate_str = _money(float(rate))
+
+        rate_text = f"1 {give_currency} = {rate_str} {recv_currency}"
+        give_amount_str = _money(float(draft.give_amount))
+        receive_amount_str = _money(float(receive_amount))
+
         summary_text = (
-            "Почти готово. Проверьте, пожалуйста, данные заявки – покажу всё одним блоком.\n"
-            f"➔ Вы отдаёте: {_money(float(draft.give_amount))} {give_currency}\n"
-            f"➔ Офис: {office_label}\n"
-            f"➔ Дата сделки: {draft.desired_date.strftime('%d.%m.%Y')}\n"
-            f"➔ Текущий курс: {rate}\n"
-            f"➔ Вы получаете: {_money(receive_amount)} {recv_currency}\n\n"
-            f"{DISCLAIMER}\n\n"
-            "Всё верно? Нажмите «Да, все отлично» и я создам заявку.\n"
-            "Если хотите что-то поправить – нажмите «Нет, хочу внести изменения»."
+            "🧾 Сводка заявки\n"
+            f"{sep}\n"
+            f"➡️ Отправляете: {give_amount_str} {give_currency}\n"
+            f"⬅️ Получаете: {receive_amount_str} {recv_currency}\n\n"
+            f"🏢 Офис: {office_label}\n"
+            f"📅 Дата сделки: {draft.desired_date.strftime('%d.%m.%Y')}\n\n"
+            f"📈 Курс: {rate_text}\n"
+            f"{sep}\n"
+            f"ℹ️ {DISCLAIMER}\n\n"
+            "✅ Всё верно?\n"
+            "Нажмите «✅ Да, всё отлично» — и я создам заявку.\n"
+            "Если нужно изменить данные — нажмите «✍️ Хочу внести изменения»."
         )
 
         draft.last_step = "summary"
