@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.requests import RequestService
 from app.config import settings
 from app.states import ExchangeFlow
 from app.keyboards import kb_confirm, kb_start
@@ -15,41 +16,68 @@ from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
 from app.services.requests import RequestService
 from app.infrastructure.crm_client import CRMTemporaryError, CRMPermanentError
+from app.utils.messages import edit_or_send
 
 router = Router()
 log = logging.getLogger("summary")
 
 
-async def send_summary(message: Message, state: FSMContext, session: AsyncSession, *, user_id: int) -> None:
+async def send_summary(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    *,
+    user_id: int,
+    edit_message: Message | None = None,
+) -> None:
     draft_repo = DraftRepository(session)
     request_repo = RequestRepository(session)
     service = RequestService(draft_repo, request_repo)
 
     try:
-        summary = await service.build_summary(user_id)
+        summary = await service.build_summary_ctx("tg", user_id)
     except ValueError as e:
         log.warning("send_summary rejected: user_id=%s err=%s", user_id, str(e))
-        await message.answer("Не получилось собрать сводку. Начните заново через /start.")
+        if edit_message is not None:
+            await edit_or_send(edit_message, "Не получилось собрать сводку. Начните заново через /start.", None)
+        else:
+            await message.answer("Не получилось собрать сводку. Начните заново через /start.")
         await state.clear()
         return
     except CRMTemporaryError:
-        await message.answer(
+        text = (
             "Сейчас не могу получить курс (временная ошибка). "
             "Пожалуйста, попробуйте ещё раз через минуту."
         )
+        if edit_message is not None:
+            await edit_or_send(edit_message, text, None)
+        else:
+            await message.answer(text)
         return
     except CRMPermanentError:
-        await message.answer(
+        text = (
             "Сейчас не могу получить курс. "
             "Пожалуйста, напишите менеджеру @coinpointlara — он поможет вручную."
         )
+        if edit_message is not None:
+            await edit_or_send(edit_message, text, None)
+        else:
+            await message.answer(text)
         return
     except Exception:
         log.exception("send_summary failed: user_id=%s", user_id)
-        await message.answer("Не удалось сформировать сводку. Попробуйте снова.")
+        text = "Не удалось сформировать сводку. Попробуйте снова."
+        if edit_message is not None:
+            await edit_or_send(edit_message, text, None)
+        else:
+            await message.answer(text)
         return
 
-    await message.answer(summary.summary_text, reply_markup=kb_confirm())
+    if edit_message is not None:
+        await edit_or_send(edit_message, summary.summary_text, kb_confirm())
+    else:
+        await message.answer(summary.summary_text, reply_markup=kb_confirm())
+
     await state.set_state(ExchangeFlow.confirming)
 
     try:
@@ -92,7 +120,8 @@ async def confirm_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession
             await draft_repo.save()
 
         await state.clear()
-        await cb.message.answer(
+        await edit_or_send(
+            cb.message,
             "Хорошо, давайте поправим. Выберите направление перевода",
             reply_markup=kb_start(),
         )
@@ -113,7 +142,7 @@ async def confirm_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
     service = RequestService(draft_repo, request_repo)
 
     try:
-        result = await service.confirm_request(cb.from_user.id)
+        result = await service.confirm_request_ctx("tg", cb.from_user.id)
 
     except CRMTemporaryError:
         await cb.message.answer(
@@ -144,11 +173,15 @@ async def confirm_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
     await state.clear()
 
     if result.already_exists:
-        await cb.message.answer(
-            "Заявка уже создана ✅ Менеджер свяжется с вами, как только возьмёт её в работу."
+        await edit_or_send(
+            cb.message,
+            "Заявка уже создана ✅ Менеджер свяжется с вами, как только возьмёт её в работу.",
+            reply_markup=None,
         )
         return
 
-    await cb.message.answer(
-        "Готово ✅ Заявка создана. Менеджер свяжется с вами в Telegram, как только возьмёт её в работу."
+    await edit_or_send(
+        cb.message,
+        "Готово ✅ Заявка создана. Менеджер свяжется с вами в Telegram, как только возьмёт её в работу.",
+        reply_markup=None,
     )

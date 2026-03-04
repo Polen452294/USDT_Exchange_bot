@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -6,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.keyboards import kb_dates_7
 from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
+from app.utils.messages import edit_or_send
 
 router = Router()
 
@@ -22,9 +25,11 @@ async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSess
 
     draft.office_id = office_id
     draft.last_step = "office"
+    draft.updated_at = datetime.utcnow()
     await drafts.save()
 
-    await cb.message.answer(
+    await edit_or_send(
+        cb.message,
         "Когда вам удобно провести обмен?\n"
         "Выберите дату из ближайших 7 дней:",
         reply_markup=kb_dates_7(),

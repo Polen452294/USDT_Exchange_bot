@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery, User
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.utils.messages import edit_or_send
 from app.repositories.drafts import DraftRepository
 from app.states import ExchangeFlow
 from app.utils import parse_date_ddmmyyyy
@@ -35,8 +36,9 @@ async def pick_date(cb: CallbackQuery, state: FSMContext, session: AsyncSession)
     except Exception:
         today = date.today()
         max_day = today + timedelta(days=MAX_DAYS_AHEAD - 1)
-        await cb.message.answer(
-            f"Некорректная дата. Можно выбрать от сегодня до {max_day.strftime('%d.%m')}."
+        await cb.answer(
+            f"Некорректная дата. Можно выбрать от сегодня до {max_day.strftime('%d.%m')}.",
+            show_alert=True,
         )
         return
 
@@ -88,11 +90,11 @@ async def go_username_step(message: Message, user: User, state: FSMContext, sess
         draft.last_step = "username_auto"
         await drafts.save()
 
-        await message.answer("Ок, контакт в Telegram найден. Готовлю сводку…")
+        await edit_or_send(message, "Ок, контакт в Telegram найден. Готовлю сводку…", reply_markup=None)
         await state.set_state(ExchangeFlow.confirming)
 
         from app.handlers.summary import send_summary
-        await send_summary(message, state, session, user_id=tg_id)
+        await send_summary(message, state, session, user_id=tg_id, edit_message=message)
         return
 
     await message.answer(

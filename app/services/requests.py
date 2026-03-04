@@ -86,15 +86,27 @@ class RequestService:
     nudge5_lead_days = int(getattr(settings, "nudge5_lead_days", 1))
     nudge6_lead_days = int(getattr(settings, "nudge6_lead_days", 2))
 
-    async def build_summary(self, telegram_user_id: int) -> SummaryResult:
-        return await self.build_summary_ctx("tg", telegram_user_id)
-
     async def build_summary_ctx(self, transport: str, peer_id: int) -> SummaryResult:
         draft = await self._drafts.get_by_transport_peer_id(transport, peer_id)
         if draft is None:
             raise ValueError("draft_not_found")
 
-        if not draft.direction or not draft.give_amount or not draft.office_id or not draft.desired_date:
+        if (
+            draft.direction is None
+            or draft.give_amount is None
+            or draft.office_id is None
+            or draft.desired_date is None
+        ):
+            log.warning(
+                "draft_not_ready: transport=%s peer_id=%s direction=%r give_amount=%r office_id=%r desired_date=%r last_step=%r",
+                transport,
+                peer_id,
+                getattr(draft, "direction", None),
+                getattr(draft, "give_amount", None),
+                getattr(draft, "office_id", None),
+                getattr(draft, "desired_date", None),
+                getattr(draft, "last_step", None),
+            )
             raise ValueError("draft_not_ready")
 
         direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))
@@ -113,7 +125,9 @@ class RequestService:
             log.exception("CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction.value)
             raise
         except Exception:
-            log.exception("Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction.value)
+            log.exception(
+                "Unexpected CRM error on summary (office_id=%s, direction=%s)", draft.office_id, direction.value
+            )
             raise CRMTemporaryError("unexpected_crm_error")
 
         if direction == Direction.TRY_CASH_TO_USDT and settings.rate_calc_mode == "divide_cash_to_usdt":
@@ -176,7 +190,22 @@ class RequestService:
         if draft is None:
             raise ValueError("draft_not_found")
 
-        if not draft.direction or not draft.give_amount or not draft.office_id or not draft.desired_date or not draft.username:
+        if (
+            draft.direction is None
+            or draft.give_amount is None
+            or draft.office_id is None
+            or draft.desired_date is None
+        ):
+            log.warning(
+                "draft_not_ready: transport=%s peer_id=%s direction=%r give_amount=%r office_id=%r desired_date=%r last_step=%r",
+                transport,
+                peer_id,
+                getattr(draft, "direction", None),
+                getattr(draft, "give_amount", None),
+                getattr(draft, "office_id", None),
+                getattr(draft, "desired_date", None),
+                getattr(draft, "last_step", None),
+            )
             raise ValueError("draft_not_ready")
 
         direction = draft.direction if isinstance(draft.direction, Direction) else Direction(str(draft.direction))

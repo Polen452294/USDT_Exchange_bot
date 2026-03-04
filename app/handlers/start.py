@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 
+from app.utils.messages import edit_or_send
 from app.config import settings
 from app.models import Direction, direction_from_currency
 from app.keyboards import kb_start
@@ -83,9 +84,14 @@ async def choose_dir(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     draft.nudge2_planned_at = datetime.utcnow() + timedelta(seconds=delay)
     draft.nudge2_sent_at = None
     draft.nudge2_answer = None
+    draft.nudge2_answered_at = None
 
     await drafts.save()
 
     give_cur = direction_from_currency(direction) or "сумму"
-    await cb.message.answer(f"Введите, пожалуйста, сумму, которую вы отдаёте ({give_cur}).")
+    await edit_or_send(
+        cb.message,
+        f"Введите, пожалуйста, сумму, которую вы отдаёте ({give_cur}).",
+        reply_markup=None,
+    )
     await state.set_state(ExchangeFlow.entering_amount)
