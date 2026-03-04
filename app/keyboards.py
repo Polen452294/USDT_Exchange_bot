@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from app.models import Direction, direction_button_label
 
 
+
 def kb_start() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -19,7 +20,6 @@ def kb_offices(offices: list[dict]) -> InlineKeyboardMarkup:
     for o in offices:
         rows.append([InlineKeyboardButton(text=o["button_text"], callback_data=f"office:{o['id']}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
 
 def kb_next() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее", callback_data="next")]])
