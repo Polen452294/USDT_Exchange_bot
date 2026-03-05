@@ -439,91 +439,91 @@ class NudgeService:
                 except Exception:
                     log.exception("n4 send failed: draft_id=%s", draft_id)
                     await self._backoff_draft(session, int(draft_id), "nudge4_sent_at", "nudge4_planned_at")
-        async def _check_nudge5(self, *, transport_filter: str | None) -> None:
-            now = datetime.utcnow()
-            today_ist = _today_istanbul()
-            ist = ZoneInfo("Europe/Istanbul")
+    async def _check_nudge5(self, *, transport_filter: str | None) -> None:
+        now = datetime.utcnow()
+        today_ist = _today_istanbul()
+        ist = ZoneInfo("Europe/Istanbul")
 
-            async with AsyncSessionLocal() as session:
-                stmt = (
-                    select(Request.id)
-                    .where(Request.nudge5_planned_at.is_not(None))
-                    .where(Request.nudge5_planned_at <= now)
-                    .where(Request.nudge5_sent_at.is_(None))
-                    .where(Request.nudge5_answer.is_(None))
-                    .order_by(Request.id.asc())
-                    .limit(50)
-                    .with_for_update(skip_locked=True)
-                )
-                if transport_filter:
-                    stmt = stmt.where(Request.transport == transport_filter)
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(Request.id)
+                .where(Request.nudge5_planned_at.is_not(None))
+                .where(Request.nudge5_planned_at <= now)
+                .where(Request.nudge5_sent_at.is_(None))
+                .where(Request.nudge5_answer.is_(None))
+                .order_by(Request.id.asc())
+                .limit(50)
+                .with_for_update(skip_locked=True)
+            )
+            if transport_filter:
+                stmt = stmt.where(Request.transport == transport_filter)
 
-                ids = [r[0] for r in (await session.execute(stmt)).all()]
-                if not ids:
-                    return
+            ids = [r[0] for r in (await session.execute(stmt)).all()]
+            if not ids:
+                return
 
-                crm = get_crm_client()
+            crm = get_crm_client()
 
-                for req_id in ids:
-                    try:
-                        req = await session.get(Request, req_id)
-                        if req is None:
-                            continue
+            for req_id in ids:
+                try:
+                    req = await session.get(Request, req_id)
+                    if req is None:
+                        continue
 
-                        transport = str(req.transport)
-                        peer_id = int(req.peer_id)
+                    transport = str(req.transport)
+                    peer_id = int(req.peer_id)
 
-                        if req.nudge5_answer is not None or req.nudge5_sent_at is not None:
-                            continue
+                    if req.nudge5_answer is not None or req.nudge5_sent_at is not None:
+                        continue
 
-                        # --- ✅ защита от “сразу пришёл” ---
-                        if req.desired_date is None:
-                            req.nudge5_sent_at = now
-                            req.nudge5_answer = "skip_date"
-                            await session.commit()
-                            continue
-
-                        days_until = (req.desired_date - today_ist).days
-
-                        # если обмен ближе чем через 14 дней — этот дожим не нужен
-                        if days_until < 14:
-                            req.nudge5_sent_at = now
-                            req.nudge5_answer = "skip_close_date"
-                            await session.commit()
-                            continue
-
-                        # если planned_at испорчен (в прошлом), но до обмена >14 дней — перепланируем
-                        if days_until > 14:
-                            target_day = req.desired_date - timedelta(days=14)
-                            target_ist = datetime.combine(target_day, time(10, 0), tzinfo=ist)
-                            target_utc = target_ist.astimezone(timezone.utc).replace(tzinfo=None)
-
-                            req.nudge5_planned_at = target_utc
-                            await session.commit()
-                            continue
-                        # --- конец защиты ---
-
-                        if req.crm_request_id:
-                            st = await asyncio.wait_for(crm.check_status(str(req.crm_request_id)), timeout=15)
-                            if isinstance(st, dict) and _crm_terminal(st):
-                                req.nudge5_sent_at = now
-                                req.nudge5_answer = "skip_terminal"
-                                await session.commit()
-                                continue
-
-                        if transport == "vk" and vk_kb_n5 is not None:
-                            markup = vk_kb_n5()
-                        else:
-                            markup = kb_nudge5(int(req_id))
-
+                    # --- ✅ защита от “сразу пришёл” ---
+                    if req.desired_date is None:
                         req.nudge5_sent_at = now
+                        req.nudge5_answer = "skip_date"
                         await session.commit()
+                        continue
 
-                        await self._send(transport, peer_id, NUDGE5_TEXT, reply_markup=markup)
+                    days_until = (req.desired_date - today_ist).days
 
-                    except Exception:
-                        log.exception("n5 send failed: req_id=%s", req_id)
-                        await self._backoff_request(session, int(req_id), "nudge5_sent_at", "nudge5_planned_at")
+                    # если обмен ближе чем через 14 дней — этот дожим не нужен
+                    if days_until < 14:
+                        req.nudge5_sent_at = now
+                        req.nudge5_answer = "skip_close_date"
+                        await session.commit()
+                        continue
+
+                    # если planned_at испорчен (в прошлом), но до обмена >14 дней — перепланируем
+                    if days_until > 14:
+                        target_day = req.desired_date - timedelta(days=14)
+                        target_ist = datetime.combine(target_day, time(10, 0), tzinfo=ist)
+                        target_utc = target_ist.astimezone(timezone.utc).replace(tzinfo=None)
+
+                        req.nudge5_planned_at = target_utc
+                        await session.commit()
+                        continue
+                    # --- конец защиты ---
+
+                    if req.crm_request_id:
+                        st = await asyncio.wait_for(crm.check_status(str(req.crm_request_id)), timeout=15)
+                        if isinstance(st, dict) and _crm_terminal(st):
+                            req.nudge5_sent_at = now
+                            req.nudge5_answer = "skip_terminal"
+                            await session.commit()
+                            continue
+
+                    if transport == "vk" and vk_kb_n5 is not None:
+                        markup = vk_kb_n5()
+                    else:
+                        markup = kb_nudge5(int(req_id))
+
+                    req.nudge5_sent_at = now
+                    await session.commit()
+
+                    await self._send(transport, peer_id, NUDGE5_TEXT, reply_markup=markup)
+
+                except Exception:
+                    log.exception("n5 send failed: req_id=%s", req_id)
+                    await self._backoff_request(session, int(req_id), "nudge5_sent_at", "nudge5_planned_at")
 
     async def _check_nudge6(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()

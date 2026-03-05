@@ -189,18 +189,19 @@ async def confirm_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSessio
 
     await state.clear()
 
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
     if result.already_exists:
-        await edit_or_send(
-            cb.message,
+        await cb.message.answer(
             "✅ Заявка уже создана\n\n"
-            "👤 Менеджер свяжется с вами, как только возьмёт её в работу.",
-            reply_markup=None,
+            "👤 Менеджер свяжется с вами, как только возьмёт её в работу."
         )
         return
 
-    await edit_or_send(
-        cb.message,
+    await cb.message.answer(
         "✅ Заявка создана!\n\n"
-        "👤 Менеджер свяжется с вами в Telegram, как только возьмёт заявку в работу.",
-        reply_markup=None,
+        "👤 Менеджер свяжется с вами в Telegram, как только возьмёт заявку в работу."
     )
