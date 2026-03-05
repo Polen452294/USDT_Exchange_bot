@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, exists
+from sqlalchemy.orm import aliased
 
 from app.config import settings
 
@@ -197,12 +198,24 @@ class NudgeService:
     async def _check_nudge1(self, *, transport_filter: str | None) -> None:
         now = datetime.utcnow()
         async with AsyncSessionLocal() as session:
+            
+            newer = aliased(Request)
             stmt = (
                 select(Request.id)
                 .where(Request.nudge1_answer.is_(None))
                 .where(Request.nudge1_sent_at.is_(None))
                 .where(Request.nudge1_planned_at.is_not(None))
                 .where(Request.nudge1_planned_at <= now)
+                # ✅ ВАЖНО: дожим-1 только для самой новой заявки юзера
+                .where(
+                    ~exists(
+                        select(1).where(
+                            newer.transport == Request.transport,
+                            newer.peer_id == Request.peer_id,
+                            newer.id > Request.id,
+                        )
+                    )
+                )
                 .order_by(Request.id.asc())
                 .limit(50)
                 .with_for_update(skip_locked=True)
