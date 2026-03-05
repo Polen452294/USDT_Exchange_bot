@@ -65,11 +65,3 @@ async def n1_click(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
         await _send_crm_event(req, "not_actual")
         await cb.message.answer("Понял ✅ Если понадобится обмен — можете начать заново через /start.")
         return
-
-    if action == "manager":
-        req.nudge1_answer = "manager"
-        req.nudge1_sent_at = req.nudge1_sent_at or datetime.utcnow()
-        await session.commit()
-        await _send_crm_event(req, "manager")
-        await cb.message.answer("Конечно. Напишите менеджеру напрямую: @coinpointlara")
-        return

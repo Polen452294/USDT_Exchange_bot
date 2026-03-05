@@ -70,7 +70,8 @@ except Exception:
 log = logging.getLogger("nudges")
 
 NUDGE1_TEXT = (
-    "Извините, похоже, менеджер задерживается. Это редко бывает, но я хочу помочь.\n"
+    "Извините, похоже менеджер задерживается.\n"
+    "Это бывает редко, но я хочу помочь.\n\n"
     "Ваша заявка всё ещё актуальна?"
 )
 
@@ -142,7 +143,7 @@ def _today_istanbul():
 
 
 class NudgeService:
-    def __init__(self, bot: Bot | None = None, *, vk_sender=None) -> None:
+    def __init__(self, bot: Bot | None = None, *, vk_sender=None) -> None: # type: ignore
         self.bot = bot
         self.vk_sender = vk_sender
 
@@ -252,7 +253,18 @@ class NudgeService:
                     if transport == "vk" and vk_kb_n1 is not None:
                         markup = vk_kb_n1()
                     else:
-                        markup = kb_nudge1()
+                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+                        req_ref = req.client_request_id or f"#{req.id}"
+                        manager_url = f"https://t.me/coinpointlara?text=Здравствуйте! Пишу по заявке {req_ref}"
+
+                        markup = InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [InlineKeyboardButton(text="✅ Да, актуально", callback_data="n1:yes")],
+                                [InlineKeyboardButton(text="❌ Нет, не актуально", callback_data="n1:no")],
+                                [InlineKeyboardButton(text="💬 Написать менеджеру", url=manager_url)],
+                            ]
+                        )
 
                     # reserve
                     req.nudge1_sent_at = now

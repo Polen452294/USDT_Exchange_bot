@@ -57,7 +57,10 @@ def kb_nudge1() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Да, актуально", callback_data="n1:yes")
     kb.button(text="❌ Нет, не актуально", callback_data="n1:no")
-    kb.button(text="💬 Написать менеджеру: @coinpointlara", callback_data="n1:manager")
+    kb.button(
+    text="💬 Написать менеджеру",
+    url="https://t.me/coinpointlara"
+    )
     kb.adjust(1)
     return kb.as_markup()
 
