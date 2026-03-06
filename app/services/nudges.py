@@ -583,90 +583,97 @@ class NudgeService:
                     log.exception("n6 send failed: req_id=%s", req_id)
                     await self._backoff_request(session, int(req_id), "nudge6_sent_at", "nudge6_planned_at")
 
-    async def _check_nudge7(self, *, transport_filter: str | None) -> None:
-        now = datetime.utcnow()
-        today_ist = _today_istanbul()
+        async def _check_nudge7(self, *, transport_filter: str | None) -> None:
+            now = datetime.utcnow()
+            today_ist = _today_istanbul()
 
-        ist = ZoneInfo("Europe/Istanbul")
-        now_ist = datetime.now(tz=ist)
-        ten_ist_today = now_ist.replace(hour=10, minute=0, second=0, microsecond=0)
+            ist = ZoneInfo("Europe/Istanbul")
+            now_ist = datetime.now(tz=ist)
+            ten_ist_today = now_ist.replace(hour=10, minute=0, second=0, microsecond=0)
 
-        grace_seconds = 15 * 60  # 15 минут
-        grace_until = ten_ist_today + timedelta(seconds=grace_seconds)
+            grace_seconds = 15 * 60
+            grace_until = ten_ist_today + timedelta(seconds=grace_seconds)
 
+            async with AsyncSessionLocal() as session:
+                newer = aliased(Request)
 
-        async with AsyncSessionLocal() as session:
-            stmt = (
-                select(Request.id)
-                .where(Request.nudge7_planned_at.is_not(None))
-                .where(Request.nudge7_planned_at <= now)
-                .where(Request.nudge7_sent_at.is_(None))
-                .where(Request.nudge7_answer.is_(None))
-                .order_by(Request.id.asc())
-                .limit(50)
-                .with_for_update(skip_locked=True)
-            )
-            if transport_filter:
-                stmt = stmt.where(Request.transport == transport_filter)
+                stmt = (
+                    select(Request.id)
+                    .where(Request.nudge7_planned_at.is_not(None))
+                    .where(Request.nudge7_planned_at <= now)
+                    .where(Request.nudge7_sent_at.is_(None))
+                    .where(Request.nudge7_answer.is_(None))
+                    .where(
+                        ~exists(
+                            select(1).where(
+                                newer.transport == Request.transport,
+                                newer.peer_id == Request.peer_id,
+                                newer.id > Request.id,
+                            )
+                        )
+                    )
+                    .order_by(Request.id.asc())
+                    .limit(50)
+                    .with_for_update(skip_locked=True)
+                )
+                if transport_filter:
+                    stmt = stmt.where(Request.transport == transport_filter)
 
-            ids = [r[0] for r in (await session.execute(stmt)).all()]
-            if not ids:
-                return
+                ids = [r[0] for r in (await session.execute(stmt)).all()]
+                if not ids:
+                    return
 
-            crm = get_crm_client()
+                crm = get_crm_client()
 
-            for req_id in ids:
-                try:
-                    req = await session.get(Request, req_id)
-                    if req is None:
-                        continue
+                for req_id in ids:
+                    try:
+                        req = await session.get(Request, req_id)
+                        if req is None:
+                            continue
 
-                    transport = str(req.transport)
-                    peer_id = int(req.peer_id)
+                        transport = str(req.transport)
+                        peer_id = int(req.peer_id)
 
-                    if req.nudge7_answer is not None or req.nudge7_sent_at is not None:
-                        continue
+                        if req.nudge7_answer is not None or req.nudge7_sent_at is not None:
+                            continue
 
-                    if req.desired_date and req.desired_date != today_ist:
-                        req.nudge7_sent_at = now
-                        req.nudge7_answer = "skip_not_today"
-                        await session.commit()
-                        continue
+                        if req.desired_date and req.desired_date != today_ist:
+                            req.nudge7_sent_at = now
+                            req.nudge7_answer = "skip_not_today"
+                            await session.commit()
+                            continue
 
-                    if req.desired_date == today_ist:
+                        if req.desired_date == today_ist:
+                            if now_ist < ten_ist_today:
+                                continue
+
+                            if now_ist > grace_until:
+                                req.nudge7_sent_at = now
+                                req.nudge7_answer = "skip_missed_10am"
+                                await session.commit()
+                                continue
+
                         if now_ist < ten_ist_today:
                             continue
 
-                        if now_ist > grace_until:
-                            req.nudge7_sent_at = now
-                            req.nudge7_answer = "skip_missed_10am"
-                            await session.commit()
-                            continue
+                        if req.crm_request_id:
+                            st = await asyncio.wait_for(crm.check_status(str(req.crm_request_id)), timeout=15)
+                            if isinstance(st, dict) and _crm_terminal(st):
+                                req.nudge7_sent_at = now
+                                req.nudge7_answer = "skip_terminal"
+                                await session.commit()
+                                continue
 
-                    # Отправляем строго после 10:00 по Турции
-                    if now_ist < ten_ist_today:
-                        continue
+                        if transport == "vk" and vk_kb_n7 is not None:
+                            markup = vk_kb_n7()
+                        else:
+                            markup = kb_nudge7(int(req_id))
 
-                    if req.crm_request_id:
-                        st = await asyncio.wait_for(crm.check_status(str(req.crm_request_id)), timeout=15)
-                        if isinstance(st, dict) and _crm_terminal(st):
-                            req.nudge7_sent_at = now
-                            req.nudge7_answer = "skip_terminal"
-                            await session.commit()
-                            continue
+                        req.nudge7_sent_at = now
+                        await session.commit()
 
-                    if transport == "vk" and vk_kb_n7 is not None:
-                        markup = vk_kb_n7()
-                    else:
-                        markup = kb_nudge7(int(req_id))
+                        await self._send(transport, peer_id, NUDGE7_TEXT, reply_markup=markup)
 
-                    # reserve
-                    req.nudge7_sent_at = now
-                    await session.commit()
-
-                    # send
-                    await self._send(transport, peer_id, NUDGE7_TEXT, reply_markup=markup)
-
-                except Exception:
-                    log.exception("n7 send failed: req_id=%s", req_id)
-                    await self._backoff_request(session, int(req_id), "nudge7_sent_at", "nudge7_planned_at")
+                    except Exception:
+                        log.exception("n7 send failed: req_id=%s", req_id)
+                        await self._backoff_request(session, int(req_id), "nudge7_sent_at", "nudge7_planned_at")

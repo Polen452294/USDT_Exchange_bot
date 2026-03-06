@@ -20,6 +20,12 @@ def kb_start() -> InlineKeyboardMarkup:
                     callback_data="dir:TRY_CASH_TO_USDT",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="💳 Купить USDT с карты СБП",
+                    url="https://t.me/CoinPlata_bot",
+                )
+            ],
         ]
     )
 
