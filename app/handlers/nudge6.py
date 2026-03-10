@@ -44,14 +44,20 @@ async def on_nudge6_answer(call: CallbackQuery):
         req.nudge6_answer = answer
         req.nudge6_answered_at = now
         await session.commit()
+
         try:
             await send_request_nudge_event(req, "nudge6", action)
         except Exception:
-            log.exception("CRM event failed: nudge5")
+            log.exception("CRM event failed: nudge6")
 
     if answer == "YES":
-        await call.message.answer("Отлично. Передал менеджеру, он свяжется с вами в Telegram.")
+        text = "Отлично. Передал менеджеру, он свяжется с вами в Telegram."
     else:
-        await call.message.answer("Хорошо, понял. Если понадобится помощь — пишите @coinpointlara.")
+        text = "Хорошо, понял. Если понадобится помощь — пишите @coinpointlara."
+
+    try:
+        await call.message.edit_text(text)
+    except Exception:
+        await call.message.answer(text)
 
     await call.answer()

@@ -525,63 +525,80 @@ class NudgeService:
                     log.exception("n5 send failed: req_id=%s", req_id)
                     await self._backoff_request(session, int(req_id), "nudge5_sent_at", "nudge5_planned_at")
 
-    async def _check_nudge6(self, *, transport_filter: str | None) -> None:
-        now = datetime.utcnow()
-        async with AsyncSessionLocal() as session:
-            stmt = (
-                select(Request.id)
-                .where(Request.nudge6_planned_at.is_not(None))
-                .where(Request.nudge6_planned_at <= now)
-                .where(Request.nudge6_sent_at.is_(None))
-                .where(Request.nudge6_answer.is_(None))
-                .order_by(Request.id.asc())
-                .limit(50)
-                .with_for_update(skip_locked=True)
-            )
-            if transport_filter:
-                stmt = stmt.where(Request.transport == transport_filter)
+        async def _check_nudge6(self, *, transport_filter: str | None) -> None:
+            now = datetime.utcnow()
+            async with AsyncSessionLocal() as session:
+                newer = aliased(Request)
 
-            ids = [r[0] for r in (await session.execute(stmt)).all()]
-            if not ids:
-                return
+                stmt = (
+                    select(Request.id)
+                    .where(Request.nudge6_planned_at.is_not(None))
+                    .where(Request.nudge6_planned_at <= now)
+                    .where(Request.nudge6_sent_at.is_(None))
+                    .where(Request.nudge6_answer.is_(None))
+                    .where(
+                        ~exists(
+                            select(1).where(
+                                newer.transport == Request.transport,
+                                newer.peer_id == Request.peer_id,
+                                newer.id > Request.id,
+                            )
+                        )
+                    )
+                    .order_by(Request.id.asc())
+                    .limit(50)
+                    .with_for_update(skip_locked=True)
+                )
+                if transport_filter:
+                    stmt = stmt.where(Request.transport == transport_filter)
 
-            crm = get_crm_client()
+                ids = [r[0] for r in (await session.execute(stmt)).all()]
+                if not ids:
+                    return
 
-            for req_id in ids:
-                try:
-                    req = await session.get(Request, req_id)
-                    if req is None:
-                        continue
+                crm = get_crm_client()
 
-                    transport = str(req.transport)
-                    peer_id = int(req.peer_id)
-
-                    if req.nudge6_answer is not None or req.nudge6_sent_at is not None:
-                        continue
-
-                    if req.crm_request_id:
-                        st = await asyncio.wait_for(crm.check_status(str(req.crm_request_id)), timeout=15)
-                        if isinstance(st, dict) and _crm_terminal(st):
-                            req.nudge6_sent_at = now
-                            req.nudge6_answer = "skip_terminal"
-                            await session.commit()
+                for req_id in ids:
+                    try:
+                        req = await session.get(Request, req_id)
+                        if req is None:
                             continue
 
-                    if transport == "vk" and vk_kb_n6 is not None:
-                        markup = vk_kb_n6()
-                    else:
-                        markup = kb_nudge6(int(req_id))
+                        transport = str(req.transport)
+                        peer_id = int(req.peer_id)
 
-                    # reserve
-                    req.nudge6_sent_at = now
-                    await session.commit()
+                        if req.nudge6_answer is not None or req.nudge6_sent_at is not None:
+                            continue
 
-                    # send
-                    await self._send(transport, peer_id, NUDGE6_TEXT, reply_markup=markup)
+                        if req.crm_request_id:
+                            st = await asyncio.wait_for(
+                                crm.check_status(str(req.crm_request_id)),
+                                timeout=15,
+                            )
+                            if isinstance(st, dict) and _crm_terminal(st):
+                                req.nudge6_sent_at = now
+                                req.nudge6_answer = "skip_terminal"
+                                await session.commit()
+                                continue
 
-                except Exception:
-                    log.exception("n6 send failed: req_id=%s", req_id)
-                    await self._backoff_request(session, int(req_id), "nudge6_sent_at", "nudge6_planned_at")
+                        if transport == "vk" and vk_kb_n6 is not None:
+                            markup = vk_kb_n6()
+                        else:
+                            markup = kb_nudge6(int(req_id))
+
+                        req.nudge6_sent_at = now
+                        await session.commit()
+
+                        await self._send(transport, peer_id, NUDGE6_TEXT, reply_markup=markup)
+
+                    except Exception:
+                        log.exception("n6 send failed: req_id=%s", req_id)
+                        await self._backoff_request(
+                            session,
+                            int(req_id),
+                            "nudge6_sent_at",
+                            "nudge6_planned_at",
+                        )
 
         async def _check_nudge7(self, *, transport_filter: str | None) -> None:
             now = datetime.utcnow()
