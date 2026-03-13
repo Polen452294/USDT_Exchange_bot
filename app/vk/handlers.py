@@ -79,17 +79,16 @@ def _offices() -> list[Tuple[str, str]]:
 def _office_text() -> str:
     return (
         "🏢 Выберите офис, где вам удобнее провести обмен:\n\n"
-        "1) 📍 Анталия Центр\n"
+        "📍 Анталия Центр\n"
         "Kestane İş Merkezi\n"
         "Muratpaşa, 07040 Muratpaşa/Antalya, Турция\n\n"
-        "2) 📍 Анталия Лара\n"
+        "📍 Анталия Лара\n"
         "Çağlayan, Barınaklar Blv.\n"
         "Köken Apartman No: 27/A, Zemin Kat\n"
         "07010 Muratpaşa/Antalya, Турция\n\n"
-        "3) 📍 Стамбул\n"
-        "VILAYETHAN BINASINDA BULUNAN -IB NOLU DÜKKANLAR\n"
-        "Alemdar, Ankara Cd. No:8\n"
-        "34110 Fatih/İstanbul, Турция\n\n"
+        "📍 Стамбул\n"
+        "Vilayethan binasında bulunan - IB nolu dükkanlar, Alemdar, Ankara Cd. No:8\n"
+        "34110 Fatih/İstanbul, Турция\n"
         f"{SEP}\n"
         "👇 Нажмите кнопку с нужным офисом."
     )

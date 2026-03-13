@@ -29,7 +29,7 @@ OFFICE_ADDRESS_BY_ID: dict[str, str] = {
         "Köken Apartman No: 27/A, Zemin Kat\n"
         "07010 Muratpaşa/Antalya, Турция"
     ),
-    "istanbul": (
+    "istanbul": ( 
         "📍 <b>Стамбул</b>\n"
         "Vilayethan binasında bulunan - IB nolu dükkanlar, Alemdar, Ankara Cd. No:8\n"
         "34110 Fatih/İstanbul, Турция"
