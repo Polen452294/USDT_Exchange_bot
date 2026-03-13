@@ -19,18 +19,18 @@ SEP = "━━━━━━━━━━━━━━"
 
 OFFICE_ADDRESS_BY_ID: dict[str, str] = {
     "antalya_center": (
-        "1) 📍 Анталия Центр\n"
+        "📍 <b>Анталия Центр</b>\n"
         "Kestane İş Merkezi\n"
         "Muratpaşa, 07040 Muratpaşa/Antalya, Турция"
     ),
     "antalya_lara": (
-        "2) 📍 Анталия Лара\n"
+        "📍 <b>Анталия Лара</b>\n"
         "Çağlayan, Barınaklar Blv.\n"
         "Köken Apartman No: 27/A, Zemin Kat\n"
         "07010 Muratpaşa/Antalya, Турция"
     ),
     "istanbul": (
-        "3) 📍 Стамбул\n"
+        "📍 <b>Стамбул</b>\n"
         "VILAYETHAN BINASINDA BULUNAN -IB NOLU DÜKKANLAR\n"
         "Alemdar, Ankara Cd. No:8\n"
         "34110 Fatih/İstanbul, Турция"

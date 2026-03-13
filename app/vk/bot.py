@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Optional
 
 import vk_api
 from vk_api.longpoll import VkEventType, VkLongPoll
@@ -8,27 +7,9 @@ from requests.exceptions import ReadTimeout, ConnectionError as RequestsConnecti
 
 from app.config import settings
 from app.db import AsyncSessionLocal
+from app.vk.sender import send_vk_message
 
 logger = logging.getLogger("vk")
-
-
-def _send(api, peer_id: int, text: str, keyboard: Optional[str] = None) -> None:
-    params = {"peer_id": peer_id, "message": text, "random_id": 0}
-    if keyboard is not None:
-        params["keyboard"] = keyboard
-
-    try:
-        api.messages.send(**params)
-    except vk_api.exceptions.ApiError as e:
-            try:
-                api.messages.send(**params)
-            except vk_api.exceptions.ApiError as e:
-                code = getattr(e, "code", None)
-                if code in (911, 912):
-                    params.pop("keyboard", None)
-                    api.messages.send(**params)
-                    return
-                raise
 
 
 def _vk_profile_url(api, user_id: int) -> str:
@@ -65,6 +46,7 @@ async def run_vk_bot() -> None:
             logger.exception("vk longpoll unexpected error")
             await asyncio.sleep(2)
             continue
+
         for ev in events:
             if ev.type != VkEventType.MESSAGE_NEW:
                 continue
@@ -104,16 +86,30 @@ async def run_vk_bot() -> None:
 
                 out_text = str(result.get("text", "") or "")
                 out_kb = result.get("keyboard")
+                edit = bool(result.get("edit", True))
+                edit_key = str(result.get("edit_key", "flow"))
 
                 if out_text:
                     try:
-                        await loop.run_in_executor(None, _send, api, peer_id, out_text, out_kb)
+                        await send_vk_message(
+                            peer_id,
+                            out_text,
+                            keyboard=out_kb,
+                            edit=edit,
+                            edit_key=edit_key,
+                        )
                     except Exception:
-                        logger.exception("VK send failed: peer_id=%s", peer_id)
+                        logger.exception("VK send/edit failed: peer_id=%s", peer_id)
 
             except Exception:
                 logger.exception("vk handler failed: peer_id=%s user_id=%s text=%r", peer_id, user_id, text)
                 try:
-                    await loop.run_in_executor(None, _send, api, peer_id, "Произошла ошибка. Попробуйте ещё раз.", None)
+                    await send_vk_message(
+                        peer_id,
+                        "Произошла ошибка. Попробуйте ещё раз.",
+                        keyboard=None,
+                        edit=True,
+                        edit_key="flow",
+                    )
                 except Exception:
                     logger.exception("VK error message send failed: peer_id=%s", peer_id)

@@ -10,10 +10,10 @@ from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
 from app.services.drafts import DraftService
 from app.services.requests import RequestService
-from app.db import AsyncSessionLocal
 from app.handlers import admin, nudge3, nudge4, nudge5, nudge6, nudge7, start, amount, office, date, username, summary, nudge2, nudge1
 from app.config import settings
 from app.db import AsyncSessionLocal
+from aiogram.client.default import DefaultBotProperties
 
 
 def setup_logging() -> None:
@@ -31,7 +31,9 @@ class DbSessionMiddleware(BaseMiddleware):
 
 
 def build_bot() -> Bot:
-    return Bot(token=settings.BOT_TOKEN)
+    return Bot(
+    token=settings.BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode="HTML"))
 
 
 def build_dispatcher() -> Dispatcher:

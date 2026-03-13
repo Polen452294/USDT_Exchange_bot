@@ -90,14 +90,13 @@ def _office_text() -> str:
         "VILAYETHAN BINASINDA BULUNAN -IB NOLU DÜKKANLAR\n"
         "Alemdar, Ankara Cd. No:8\n"
         "34110 Fatih/İstanbul, Турция\n\n"
+        f"{SEP}\n"
         "👇 Нажмите кнопку с нужным офисом."
     )
 
 
 def _date_text() -> str:
-    return (
-        "📅 Выберите дату сделки (из ближайших 7 дней)\n\n"
-    )
+    return "📅 Выберите дату сделки (из ближайших 7 дней)\n\n"
 
 
 def _start_text() -> str:
@@ -105,7 +104,7 @@ def _start_text() -> str:
         "👋 Привет! Я помогу оформить заявку на обмен.\n\n"
         "🧭 Выберите направление обмена ниже.\n\n"
         f"{SEP}\n"
-        "ℹ️ После подтверждения менеджер свяжется с вами в Telegram.\n"
+        "ℹ️ После подтверждения менеджер свяжется с вами.\n"
         "Если нужно быстро задать вопрос — пишите @coinpointlara."
     )
 
@@ -132,7 +131,6 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         )
         return await session.scalar(stmt)
 
-    # NUDGE 1
     if t_raw in {
         "✅ Да, актуально",
         "Да, актуально",
@@ -141,10 +139,20 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
     }:
         req = await _get_last_request()
         if req is None:
-            return {"text": "Заявка не найдена. Нажмите «📝 Создать заявку».", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Заявка не найдена. Нажмите «📝 Создать заявку».",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if req.nudge1_answer is not None:
-            return {"text": "Ответ уже принят ✅", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Ответ уже принят ✅",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if t_raw in {"✅ Да, актуально", "Да, актуально"}:
             req.nudge1_answer = "actual"
@@ -153,6 +161,8 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             return {
                 "text": "Отлично ✅ Передал менеджеру, он свяжется с вами.",
                 "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
             }
 
         req.nudge1_answer = "not_actual"
@@ -161,9 +171,10 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": "Понял ✅ Если понадобится обмен — можете начать заново через «📝 Создать заявку».",
             "keyboard": main_menu_keyboard(),
+            "edit": True,
+            "edit_key": "nudge",
         }
 
-    # NUDGE 2
     if t_raw in {
         "➡️ Продолжить",
         "Продолжить",
@@ -172,10 +183,20 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
     }:
         draft = await _get_draft()
         if draft is None:
-            return {"text": "Нажмите «📝 Создать заявку», чтобы начать.", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Нажмите «📝 Создать заявку», чтобы начать.",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if draft.nudge2_answer is not None:
-            return {"text": "Ответ уже принят ✅", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Ответ уже принят ✅",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if t_raw in {"➡️ Продолжить", "Продолжить"}:
             draft.nudge2_answer = "continue"
@@ -185,15 +206,35 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
 
             if draft.direction and draft.give_amount and draft.office_id and draft.desired_date:
                 summary = await request_service.build_summary_ctx("vk", peer_id)
-                return {"text": summary.summary_text, "keyboard": confirm_keyboard()}
+                return {
+                    "text": summary.summary_text,
+                    "keyboard": confirm_keyboard(),
+                    "edit": True,
+                    "edit_key": "flow",
+                }
 
             if draft.direction and draft.give_amount and draft.office_id:
-                return {"text": _date_text(), "keyboard": dates_keyboard()}
+                return {
+                    "text": _date_text(),
+                    "keyboard": dates_keyboard(),
+                    "edit": True,
+                    "edit_key": "flow",
+                }
 
             if draft.direction and draft.give_amount:
-                return {"text": _office_text(), "keyboard": offices_keyboard(_offices())}
+                return {
+                    "text": _office_text(),
+                    "keyboard": offices_keyboard(_offices()),
+                    "edit": True,
+                    "edit_key": "flow",
+                }
 
-            return {"text": "🧭 Выберите направление обмена:", "keyboard": direction_keyboard()}
+            return {
+                "text": "🧭 Выберите направление обмена:",
+                "keyboard": direction_keyboard(),
+                "edit": True,
+                "edit_key": "flow",
+            }
 
         draft.nudge2_answer = "later"
         draft.nudge2_answered_at = now
@@ -201,9 +242,10 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": "Хорошо, понял. Если решите продолжить — нажмите «📝 Создать заявку».",
             "keyboard": main_menu_keyboard(),
+            "edit": True,
+            "edit_key": "nudge",
         }
 
-    # NUDGE 3
     if t_raw in {
         "✅ Да, зафиксировать",
         "Да, зафиксировать",
@@ -212,10 +254,20 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
     }:
         draft = await _get_draft()
         if draft is None:
-            return {"text": "Ок.", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Ок.",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if draft.nudge3_answer is not None:
-            return {"text": "Ответ уже принят ✅", "keyboard": main_menu_keyboard()}
+            return {
+                "text": "Ответ уже принят ✅",
+                "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
+            }
 
         if t_raw in {"✅ Да, зафиксировать", "Да, зафиксировать"}:
             draft.nudge3_answer = "yes"
@@ -223,6 +275,8 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             return {
                 "text": "Отлично ✅ Передал менеджеру, он поможет зафиксировать условия.",
                 "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
             }
 
         draft.nudge3_answer = "no"
@@ -230,9 +284,10 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": "Хорошо 👍 Если решите продолжить — нажмите «📝 Создать заявку».",
             "keyboard": main_menu_keyboard(),
+            "edit": True,
+            "edit_key": "nudge",
         }
 
-    # NUDGE 4
     if t_raw in {"✅ Да", "Да"}:
         draft = await _get_draft()
         if draft and draft.nudge4_sent_at is not None and draft.nudge4_answer is None:
@@ -242,9 +297,10 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             return {
                 "text": "Отлично ✅ Передал менеджеру, он свяжется с вами.",
                 "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "nudge",
             }
 
-    # NUDGE 5 / 6 / 7
     if t_raw in {"✅ Да", "Да", "❌ Нет", "Нет"}:
         req = await _get_last_request()
         if req:
@@ -254,12 +310,16 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
                 await session.commit()
                 if req.nudge5_answer == "YES":
                     return {
-                        "text": "Отлично. Передал менеджеру, он свяжется с вами в Telegram.",
+                        "text": "Отлично. Передал менеджеру, он свяжется с вами.",
                         "keyboard": main_menu_keyboard(),
+                        "edit": True,
+                        "edit_key": "nudge",
                     }
                 return {
                     "text": "Хорошо, понял. Если понадобится помощь — пишите @coinpointlara.",
                     "keyboard": main_menu_keyboard(),
+                    "edit": True,
+                    "edit_key": "nudge",
                 }
 
             if req.nudge6_sent_at is not None and req.nudge6_answer is None:
@@ -268,12 +328,16 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
                 await session.commit()
                 if req.nudge6_answer == "YES":
                     return {
-                        "text": "Отлично. Передал менеджеру, он свяжется с вами в Telegram.",
+                        "text": "Отлично. Передал менеджеру, он свяжется с вами.",
                         "keyboard": main_menu_keyboard(),
+                        "edit": True,
+                        "edit_key": "nudge",
                     }
                 return {
                     "text": "Хорошо, понял. Если понадобится помощь — пишите @coinpointlara.",
                     "keyboard": main_menu_keyboard(),
+                    "edit": True,
+                    "edit_key": "nudge",
                 }
 
             if req.nudge7_sent_at is not None and req.nudge7_answer is None:
@@ -282,31 +346,48 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
                 await session.commit()
                 if req.nudge7_answer == "YES":
                     return {
-                        "text": "Отлично. Передал менеджеру, он свяжется с вами в Telegram.",
+                        "text": "Отлично. Передал менеджеру, он свяжется с вами.",
                         "keyboard": main_menu_keyboard(),
+                        "edit": True,
+                        "edit_key": "nudge",
                     }
                 return {
                     "text": "Хорошо. Если понадобится помощь — пишите @coinpointlara.",
-                        "keyboard": main_menu_keyboard(),
-                    }
+                    "keyboard": main_menu_keyboard(),
+                    "edit": True,
+                    "edit_key": "nudge",
+                }
 
     if t in {"/start", "начать", "старт", "меню"}:
         await draft_service.reset("vk", peer_id)
-        return {"text": _start_text(), "keyboard": direction_keyboard()}
+        return {
+            "text": _start_text(),
+            "keyboard": direction_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     if t_raw in {"Информация", "📝 Создать заявку", "Создать заявку"}:
         await draft_service.reset("vk", peer_id)
-        return {"text": _start_text(), "keyboard": direction_keyboard()}
+        return {
+            "text": _start_text(),
+            "keyboard": direction_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     if t_raw == "USDT в наличные":
         await draft_service.set_direction("vk", peer_id, Direction.USDT_TO_TRY_CASH)
         return {
             "text": (
                 "💰 Укажите сумму, которую вы отдаёте\n\n"
+                f"{SEP}\n"
                 "✍️ Отправьте число сообщением\n"
                 "Валюта: USDT"
             ),
             "keyboard": hide_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
         }
 
     if t_raw == "Наличные в USDT":
@@ -314,35 +395,58 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": (
                 "💰 Укажите сумму, которую вы отдаёте\n\n"
+                f"{SEP}\n"
                 "✍️ Отправьте число сообщением\n"
                 "Валюта: TRY"
             ),
             "keyboard": hide_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
         }
 
     amount = _parse_amount(t_raw)
     if amount is not None:
         await draft_service.set_amount("vk", peer_id, amount)
-        return {"text": _office_text(), "keyboard": offices_keyboard(_offices())}
+        return {
+            "text": _office_text(),
+            "keyboard": offices_keyboard(_offices()),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     office_map = {label: oid for oid, label in _offices()}
     if t_raw in office_map:
         await draft_service.set_office("vk", peer_id, office_map[t_raw])
-        return {"text": _date_text(), "keyboard": dates_keyboard()}
+        return {
+            "text": _date_text(),
+            "keyboard": dates_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     parsed_button_date = _parse_date_button(t_raw)
     if parsed_button_date is not None:
         await draft_service.set_date("vk", peer_id, parsed_button_date)
         await draft_service.set_username("vk", peer_id, vk_profile_url)
         summary = await request_service.build_summary_ctx("vk", peer_id)
-        return {"text": summary.summary_text, "keyboard": confirm_keyboard()}
+        return {
+            "text": summary.summary_text,
+            "keyboard": confirm_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     parsed_manual_date = _parse_date_manual(t_raw)
     if parsed_manual_date is not None:
         await draft_service.set_date("vk", peer_id, parsed_manual_date)
         await draft_service.set_username("vk", peer_id, vk_profile_url)
         summary = await request_service.build_summary_ctx("vk", peer_id)
-        return {"text": summary.summary_text, "keyboard": confirm_keyboard()}
+        return {
+            "text": summary.summary_text,
+            "keyboard": confirm_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
+        }
 
     if t_raw == "✅ Да, всё отлично":
         draft = await draft_service.get("vk", peer_id)
@@ -350,6 +454,8 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             return {
                 "text": "Заявка уже обработана. Нажмите «📝 Создать заявку».",
                 "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "flow",
             }
 
         result = await request_service.confirm_request_ctx("vk", peer_id)
@@ -361,14 +467,18 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
                     "👤 Менеджер свяжется с вами, как только возьмёт её в работу."
                 ),
                 "keyboard": main_menu_keyboard(),
+                "edit": False,
+                "edit_key": "flow",
             }
 
         return {
             "text": (
                 "✅ Заявка создана!\n\n"
-                "👤 Менеджер свяжется с вами в Telegram, как только возьмёт заявку в работу."
+                "👤 Менеджер свяжется с вами, как только возьмёт заявку в работу."
             ),
             "keyboard": main_menu_keyboard(),
+            "edit": False,
+            "edit_key": "flow",
         }
 
     if t_raw == "✍️ Хочу внести изменения":
@@ -377,6 +487,8 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
             return {
                 "text": "Сценарий завершён. Чтобы начать заново — нажмите «📝 Создать заявку».",
                 "keyboard": main_menu_keyboard(),
+                "edit": True,
+                "edit_key": "flow",
             }
 
         await draft_service.reset("vk", peer_id)
@@ -386,12 +498,21 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
                 "🧭 Выберите направление обмена:"
             ),
             "keyboard": direction_keyboard(),
+            "edit": True,
+            "edit_key": "flow",
         }
 
     if t_raw in {"💳 Купить USDT с карты СБП", "Купить USDT с карты СБП"}:
         return {
             "text": "Для покупки USDT с карты СБП перейдите в бот: https://t.me/CoinPlata_bot",
             "keyboard": main_menu_keyboard(),
+            "edit": False,
+            "edit_key": "flow",
         }
 
-    return {"text": "Ок.", "keyboard": main_menu_keyboard()}
+    return {
+        "text": "Ок.",
+        "keyboard": main_menu_keyboard(),
+        "edit": False,
+        "edit_key": "flow",
+    }

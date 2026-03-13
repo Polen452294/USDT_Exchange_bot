@@ -26,6 +26,7 @@ logs/
 # caches / sessions
 *.session
 *.session-journal
+*.json
 
 # DB / local artifacts
 *.sqlite
