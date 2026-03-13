@@ -19,6 +19,11 @@ SEP = "━━━━━━━━━━━━━━"
 async def choose_office(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     await cb.answer()
 
+    current_state = await state.get_state()
+    if current_state != ExchangeFlow.choosing_office.state:
+        await cb.answer("Заявка уже изменена. Начните новую.", show_alert=True)
+        return
+
     office_id = cb.data.split(":", 1)[1]
     tg_id = cb.from_user.id
 

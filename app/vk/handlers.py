@@ -380,7 +380,6 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": (
                 "💰 Укажите сумму, которую вы отдаёте\n\n"
-                f"{SEP}\n"
                 "✍️ Отправьте число сообщением\n"
                 "Валюта: USDT"
             ),
@@ -394,7 +393,6 @@ async def handle_vk_message(container, peer_id: int, user_id: int, text: str, vk
         return {
             "text": (
                 "💰 Укажите сумму, которую вы отдаёте\n\n"
-                f"{SEP}\n"
                 "✍️ Отправьте число сообщением\n"
                 "Валюта: TRY"
             ),
