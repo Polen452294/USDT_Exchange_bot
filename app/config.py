@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     nudge_worker_interval_seconds: int = 5
 
     # базовые задержки (если какой-то дожим не имеет отдельного test_mode)
-    nudge1_delay_seconds: int = 900  # 15 минут
+    nudge1_delay_seconds: int = 5  # 15 минут
     nudge2_delay_seconds: int = 1200  # 20 минут
     nudge3_delay_seconds: int = 7200  # 2 часа
     nudge4_delay_seconds: int = 86400  # 24 часа
@@ -37,11 +37,11 @@ class Settings(BaseSettings):
     nudge7_test_mode: bool = False
     nudge7_test_delay_seconds: int = 120
 
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_NAME: str = "usdt_exchange"
-    DB_USER: str = "postgres"
-    DB_PASSWORD: str = "postgres"
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "postgres"
+    db_user: str = "postgres"
+    db_password: str = "postgres"
 
     LOG_LEVEL: str = "INFO"
 
@@ -62,6 +62,8 @@ class Settings(BaseSettings):
 
     VK_TOKEN: str | None = None
     VK_GROUP_ID: int | None = None
+
+    TG_PROXY_URL: str | None = None
 
     ADMIN_IDS: str = ""
 
@@ -84,8 +86,8 @@ class Settings(BaseSettings):
     @property
     def db_url(self) -> str:
         return (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
 

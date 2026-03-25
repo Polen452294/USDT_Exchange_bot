@@ -4,16 +4,32 @@ import logging
 from typing import Any, Dict
 
 from aiogram import BaseMiddleware, Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import TelegramObject
 
+from app.config import settings
+from app.db import AsyncSessionLocal
+from app.handlers import (
+    admin,
+    amount,
+    date,
+    nudge1,
+    nudge2,
+    nudge3,
+    nudge4,
+    nudge5,
+    nudge6,
+    nudge7,
+    office,
+    start,
+    summary,
+    username,
+)
 from app.repositories.drafts import DraftRepository
 from app.repositories.requests import RequestRepository
 from app.services.drafts import DraftService
 from app.services.requests import RequestService
-from app.handlers import admin, nudge3, nudge4, nudge5, nudge6, nudge7, start, amount, office, date, username, summary, nudge2, nudge1
-from app.config import settings
-from app.db import AsyncSessionLocal
-from aiogram.client.default import DefaultBotProperties
 
 
 def setup_logging() -> None:
@@ -31,14 +47,21 @@ class DbSessionMiddleware(BaseMiddleware):
 
 
 def build_bot() -> Bot:
+    if settings.TG_PROXY_URL:
+        session = AiohttpSession(proxy=settings.TG_PROXY_URL)
+        return Bot(
+            token=settings.BOT_TOKEN,
+            session=session,
+            default=DefaultBotProperties(parse_mode="HTML"),
+        )
+
     return Bot(
-    token=settings.BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode="HTML"))
+        token=settings.BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode="HTML"),
+    )
 
 
 def build_dispatcher() -> Dispatcher:
-    from app.handlers import start, amount, office, date, username, summary
-
     dp = Dispatcher()
     dp.update.middleware(DbSessionMiddleware())
 
@@ -58,6 +81,7 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(admin.router)
 
     return dp
+
 
 def build_services(session):
     draft_repo = DraftRepository(session)

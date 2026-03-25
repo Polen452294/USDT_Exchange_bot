@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, exists
 from sqlalchemy.orm import aliased
 from datetime import datetime, timedelta, time, timezone
+from urllib.parse import quote
 
 from app.config import settings
 
@@ -255,7 +256,8 @@ class NudgeService:
 
                         manager_username = "coinpointlara"
                         req_ref = (req.client_request_id or req.crm_request_id or f"#{req.id}").strip()
-                        manager_url = f"https://t.me/{manager_username}"
+                        prefilled_text = f"Здравствуйте! Пишу по заявке {req_ref}"
+                        manager_url = f"https://t.me/{manager_username}?text={quote(prefilled_text)}"
 
                         markup = InlineKeyboardMarkup(
                             inline_keyboard=[
@@ -269,7 +271,7 @@ class NudgeService:
                             "Извините, похоже менеджер задерживается.\n"
                             "Это бывает редко, но я хочу помочь.\n\n"
                             "Ваша заявка всё ещё актуальна?\n\n"
-                            f"Если хотите ускорить процесс — нажмите «💬 Написать менеджеру» и укажите номер заявки <code>{req_ref}</code>."
+                            "Если хотите ускорить процесс — нажмите «💬 Написать менеджеру»."
                         )
 
                     req.nudge1_sent_at = now
